@@ -1,6 +1,6 @@
 (ns user
   (:require [dumpr.core :as dumpr]
-            [clojure.core.async :as async :refer [<! go-loop]]))
+            [clojure.core.async :as async :refer [<! go go-loop]]))
 
 (def db-spec
   {:subprotocol "mysql"
@@ -22,9 +22,10 @@
 
 (comment
   (def context (dumpr/create db-spec [:communities :listings :people :communities_listings]))
-  (def res (dumpr/load-tables context))
+  (def res (dumpr/load-tables context (async/chan 278)))
   (def out-rows (sink (:out res)))
   (count @out-rows)
   (first @out-rows)
   (last @out-rows)
+  (go (<! (:out res)))
   )

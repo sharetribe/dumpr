@@ -33,7 +33,7 @@
                  :row-fn (fn [v]
                            ;; Block until output written to make sure
                            ;; we don't close DB connection too early.
-                           (async/>!! ch v)
+                           (async/>!! ch (upsert table v))
                            1)
                  :result-set-fn (partial reduce + 0))]
       (log/info "Loaded" count "rows from table" table))
