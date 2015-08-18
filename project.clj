@@ -1,5 +1,5 @@
 (defproject dumpr "0.1.0-SNAPSHOT"
-  :description "Library to consume MySQL contents as stream of updates."
+  :description "Library to consume MySQL contents as a stream of updates."
   :url "FIXME"
 
   :source-paths ["src"]

@@ -1,6 +1,6 @@
 # dumpr
 
-A Clojure library for consuming MySQL contents as streams of updates.
+A Clojure library for consuming MySQL contents as a stream of updates.
 
 ## Usage
 
