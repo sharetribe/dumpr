@@ -21,11 +21,22 @@
     a))
 
 (comment
-  (def context (dumpr/create db-spec [:communities :listings :people :communities_listings]))
-  (def res (dumpr/load-tables context (async/chan 278)))
+  (def context
+    (dumpr/create db-spec
+                  [:communities
+                   :listings
+                   :people
+                   {:table :communities_listings
+                    :id-fn (fn [v]
+                             (str (:community_id v) "-" (:listing_id v)))}]))
+
+  (with-bindings {#'dumpr/*parallel-table-loads* 1}
+    (dumpr/load-tables context (async/chan 10)))
+
+  (def res (dumpr/load-tables context (async/chan 1000)))
   (def out-rows (sink (:out res)))
   (count @out-rows)
-  (first @out-rows)
+  (take 3 (first @out-rows))
   (last @out-rows)
   (go (<! (:out res)))
   )
