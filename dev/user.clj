@@ -50,35 +50,23 @@
   (last @out-rows)
   (go (println (<! (:out res))))
 
-  (dumpr/query-binlog-position (:db-spec context))
-  (def schema (dumpr/fetch-table-schema (:db-spec context) (-> context :conf :db) :listings))
-  (dumpr/parse-table-schema schema :listings)
-
   (def stream-ctx (dumpr/stream-binlog context (:binlog-pos res)))
   (def out-events (sink-and-print (:out stream-ctx)))
   (count @out-events)
 
-  (def table-map (atom {}))
-  (map #(dumpr/handle-event % table-map (:conf context)) @out-events)
-
-  (dumpr/handle-event (second @out-events) table-map (:conf context))
+  (.connect (:client stream-ctx) 1000)
+  (.disconnect (:client stream-ctx))
 
   (count @dumpr/events)
   (reset! dumpr/events [])
 
   (require '[dumpr.events :as events])
   (def test-events @dumpr/events)
-  (map events/parse-event test-events)
 
-  (.connect (:client stream-ctx) 1000)
-  (.disconnect (:client stream-ctx))
-
-  (last @dumpr/event)
-  (map dumpr/parse-event @dumpr/events)
-  (def ev (second @dumpr/events))
-  (.. ev getHeader getNextPosition)
-  (java.util.Date. (.. ev getHeader getTimestamp))
-  (.getData ev)
+  (->> (take 1 (drop 8 (map events/parse-event test-events)))
+       first
+       second
+       :rows)
   )
 
 

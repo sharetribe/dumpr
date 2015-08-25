@@ -115,7 +115,7 @@
          in         (chan 0)
          _          (async/pipeline-async *parallel-table-loads*
                                           out
-                                          (partial query/stream-table db-spec) ; TODO key handling, upserts
+                                          (partial query/stream-table db-spec) ; TODO upserts
                                           in)
          _          (async/onto-chan in (map ensure-table-spec tables))]
      {:out out
@@ -124,27 +124,11 @@
 (defn stream-binlog
   ([ctx binlog-pos] (stream-binlog ctx binlog-pos (chan stream-buffer-default-size)))
   ([ctx binlog-pos out]
-   (let [event-types #{
-                       ;; ::query
-                       ::table-map
-                       ;; ::xid
-                       ::rotate
-                       ::stop
-                       ::pre-ga-write-rows
-                       ::ext-write-rows
-                       ::write-rows
-                       ::pre-ga-update-rows
-                       ::ext-update-rows
-                       ::update-rows
-                       ::pre-ga-delete-rows
-                       ::ext-delete-rows
-                       ::delete-rows}
-         events-ch   (chan 1 (comp (map events/parse-event)
+   (let [events-ch   (chan 1 (comp (map events/parse-event)
                                    (remove nil?)))
          client      (new-binlog-client (:conf ctx)
                                         binlog-pos
-                                        events-ch
-                                        :filter-types event-types)]
+                                        events-ch)]
      {:client client
       :out events-ch})))
 

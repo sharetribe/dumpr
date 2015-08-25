@@ -86,9 +86,17 @@
                :table    (.getTable data)}])
 
 
-(defn upsert-parser [data]
-  [:upsert {:table-id (.getTableId data)
-            :rows (.getRows data)}])
+(defn update-parser [data]
+  [:update {:table-id (.getTableId data)
+            :rows     (for [[k v] (.getRows data)] [(into [] k) (into [] v)])}])
+
+(defn write-parser [data]
+  [:write {:table-id (.getTableId data)
+           :rows (map (partial into []) (.getRows data))}])
+
+(defn delete-parser [data]
+  [:delete {:table-id (.getTableId data)
+            :rows (map (partial into []) (.getRows data))}])
 
 (defn stop-parser [data]
   [:stop nil])
@@ -97,7 +105,9 @@
   (let [rotate    (event-parser rotate-parser)
         query     (event-parser query-parser)
         table-map (event-parser table-map-parser)
-        upsert    (event-parser upsert-parser)
+        update    (event-parser update-parser)
+        write     (event-parser write-parser)
+        delete    (event-parser delete-parser)
         xid       (event-parser xid-parser)
         stop      (event-parser stop-parser)]
     {::ev-query query
@@ -105,19 +115,23 @@
      ::ev-xid xid
      ::ev-rotate rotate
      ::ev-stop stop
-     ::ev-pre-ga-write-rows upsert
-     ::ev-ext-write-rows upsert
-     ::ev-write-rows upsert
-     ::ev-pre-ga-update-rows upsert
-     ::ev-ext-update-rows upsert
-     ::ev-update-rows upsert
-     ::ev-pre-ga-delete-rows upsert
-     ::ev-ext-delete-rows upsert
-     ::ev-delete-rows upsert}))
+     ::ev-pre-ga-write-rows write
+     ::ev-ext-write-rows write
+     ::ev-write-rows write
+     ::ev-pre-ga-update-rows update
+     ::ev-ext-update-rows update
+     ::ev-update-rows update
+     ::ev-pre-ga-delete-rows delete
+     ::ev-ext-delete-rows delete
+     ::ev-delete-rows delete}))
 
 
 (defn parse-event [payload]
   "Parse native Binlog client event to Clojure data. Returns nil if
   the event has no parsing logic defined."
-  (when-let [parser (-> payload .getHeader .getEventType event-mappings event-parsers)]
+  (when-let [parser (-> payload
+                        .getHeader
+                        .getEventType
+                        event-mappings
+                        event-parsers)]
     (parser payload)))
