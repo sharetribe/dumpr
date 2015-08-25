@@ -1,6 +1,7 @@
 (ns dumpr.stream
-  "Transducers to transform the stream of parsed binlog events."
-  (:require [clojure.core.async :as async]))
+  "Transformations for the stream of parsed binlog events."
+  (:require [clojure.core.async :as async]
+            [dumpr.query :as query]))
 
 (defn- preserving-reduced
   [rf]
@@ -81,3 +82,54 @@
              (if (= (first prior) :table-map)
                (rf result [prior input])      ; Return table-map op as pair
                (rf result [input])))))))))    ; op without table map, just wrap
+
+
+;; TODO Table schema caching
+(defn- load-and-add-schema [db-spec table-map]
+  (let [{:keys [db table]} (second table-map)
+        cols               (query/fetch-table-cols db-spec db table)]
+    (assoc-in table-map
+              [1 :schema]
+              (query/parse-table-schema cols))))
+
+(defn fetch-table-schema [db-spec event-pair]
+  (let [[f s] event-pair]
+    (if (= (first f) :table-map)
+      [(load-and-add-schema db-spec f) s]
+      event-pair)))
+
+(defn- ->row-tuple
+  [row-data mutation-type table id-col col-names meta]
+  (let [mapped-row (zipmap col-names row-data)
+        id         (id-col mapped-row)]
+    (if (= :delete mutation-type)
+      [:delete table id mapped-row meta]
+      [:upsert table id mapped-row meta])))
+
+(defn convert-with-schema
+  "Given an event-pair of table-map and mutation (write/update/delete)
+  returns a seq of tuples, one per row in mutation, of format
+  [row-type table-key id mapped-row meta]. The elements are:
+    * row-type - :upsert or :delete
+    * table-key - The table name as keyword
+    * id - Value of the row primary key
+    * mapped-row - Row contents as a map for :upsert, nil for :delete
+    * meta - binlog position and ts from the source binlog event"
+ [event-pair]
+ (let [[table-map mutation] event-pair
+       mutation-type (first mutation)]
+    (if (and (= :table-map (first table-map))
+             (#{:write :update :delete} mutation-type))
+      (let [table     (-> table-map second :table keyword)
+            schema    (-> table-map second :schema)
+            id-col    (:primary-key schema)
+            col-names (->> schema :cols (map :name))
+            rows      (-> mutation second :rows)
+            meta      (nth mutation 2)]
+        (map
+         #(->row-tuple % mutation-type table id-col col-names meta)
+         rows))
+      (throw (ex-info
+              (str "Expected event-pair starting with :table-map, got: "
+                   (first table-map))
+              :event-pair event-pair)))))

@@ -39,3 +39,24 @@
                  :result-set-fn (partial reduce + 0))]
       (log/info "Loaded" count "rows from table" table))
     (async/close! ch)))
+
+(defn fetch-table-cols [db-spec db table]
+  (jdbc/query
+   db-spec
+   [" SELECT COLUMN_NAME, DATA_TYPE, COLUMN_KEY, CHARACTER_SET_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? and TABLE_NAME = ? ORDER BY ORDINAL_POSITION"
+    db
+    table]))
+
+(defn parse-table-schema [cols]
+  (reduce
+   (fn [schema {:keys [column_name data_type column_key character_set_name]}]
+     (let [name (keyword column_name)
+           type (keyword data_type)]
+       (if (= column_key "PRI")
+         (-> schema
+             (update-in [:cols] conj {:name name :type type :character-set character_set_name})
+             (assoc :primary-key name))
+         (-> schema
+             (update-in [:cols] conj {:name name :type type :character-set character_set_name})))))
+   {:primary-key nil :cols []}
+   cols))

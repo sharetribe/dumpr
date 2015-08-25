@@ -31,46 +31,12 @@
 
 
 
-;; Initial table load stuff...
-;;
-
-
 (defn- ensure-table-spec [name-or-spec]
   (if (keyword? name-or-spec)
     {:table name-or-spec
      :id-fn :id}
     name-or-spec))
 
-
-
-;; Binlog streaming stuff...
-;;
-
-(comment
-  (defn fetch-table-cols [db-spec db table]
-    (jdbc/query
-     db-spec
-     ["SELECT COLUMN_NAME, DATA_TYPE, COLUMN_KEY FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? and TABLE_NAME = ? ORDER BY ORDINAL_POSITION"
-      db
-      (name table)]))
-
-  (defn parse-table-schema [cols table]
-    (reduce
-     (fn [schema {:keys [column_name data_type column_key]}]
-       (let [name (keyword column_name)
-             type (keyword data_type)]
-         (if (= column_key "PRI")
-           (-> schema
-               (update-in [:cols] conj {:name name :type type})
-               (assoc :primary_key name))
-           (-> schema
-               (update-in [:cols] conj {:name name :type type})))))
-     {:table table :primary_key nil :cols []}
-     cols)))
-
-
-
-(defonce events (atom []))
 
 (defn- lifecycle-listener [out]
   (reify
@@ -89,7 +55,6 @@
   (reify
     BinaryLogClient$EventListener
     (onEvent [this payload]
-      (swap! events conj payload)
       (>!! out payload))))
 
 (defn- new-binlog-client [conf binlog-pos out & {:keys [filter-types]}]
@@ -101,6 +66,7 @@
       (.setBinlogFilename file)
       (.registerEventListener (event-listener out))
       (.registerLifecycleListener (lifecycle-listener out)))))
+
 
 
 ;; Public API
@@ -125,7 +91,8 @@
 (defn stream-binlog
   ([ctx binlog-pos] (stream-binlog ctx binlog-pos (chan stream-buffer-default-size)))
   ([ctx binlog-pos out]
-   (let [events-xform (comp (map events/parse-event)
+   (let [db-spec      (:db-spec ctx)
+         events-xform (comp (map events/parse-event)
                             (remove nil?)
                             stream/filter-txs
                             (stream/add-binlog-filename (:filename binlog-pos))
@@ -134,6 +101,12 @@
          client       (new-binlog-client (:conf ctx)
                                          binlog-pos
                                          events-ch)]
+     (async/pipeline-blocking 2
+                              out
+                              (comp (map #(stream/fetch-table-schema db-spec %))
+                                    (map stream/convert-with-schema)
+                                    cat)
+                              events-ch)
      {:client client
-      :out events-ch})))
+      :out out})))
 

@@ -88,15 +88,15 @@
 
 (defn update-parser [data]
   [:update {:table-id (.getTableId data)
-            :rows     (for [[k v] (.getRows data)] [(into [] k) (into [] v)])}])
+            :rows     (into [] (for [[_ v] (.getRows data)] (into [] v)))}])
 
 (defn write-parser [data]
   [:write {:table-id (.getTableId data)
-           :rows (map (partial into []) (.getRows data))}])
+           :rows (into [] (map (partial into []) (.getRows data)))}])
 
 (defn delete-parser [data]
   [:delete {:table-id (.getTableId data)
-            :rows (map (partial into []) (.getRows data))}])
+            :rows (into [] (map (partial into []) (.getRows data)))}])
 
 (defn stop-parser [data]
   [:stop nil])

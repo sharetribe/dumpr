@@ -13,7 +13,7 @@
                  [com.taoensso/timbre "4.1.1"]
                  [com.github.shyiko/mysql-binlog-connector-java "0.2.2"]]
 
-  ;; :global-vars {*warn-on-reflection* true}
+  :global-vars {*warn-on-reflection* true}
   :min-lein-version "2.5.0"
 
   :profiles {:dev {:source-paths ["dev"]}})
