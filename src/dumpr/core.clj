@@ -3,7 +3,8 @@
             [clojure.core.async :as async :refer [chan >!!]]
             [taoensso.timbre :as log]
             [dumpr.query :as query]
-            [dumpr.events :as events])
+            [dumpr.events :as events]
+            [dumpr.stream :as stream])
   (:import [com.github.shyiko.mysql.binlog
             BinaryLogClient
             BinaryLogClient$EventListener
@@ -124,11 +125,15 @@
 (defn stream-binlog
   ([ctx binlog-pos] (stream-binlog ctx binlog-pos (chan stream-buffer-default-size)))
   ([ctx binlog-pos out]
-   (let [events-ch   (chan 1 (comp (map events/parse-event)
-                                   (remove nil?)))
-         client      (new-binlog-client (:conf ctx)
-                                        binlog-pos
-                                        events-ch)]
+   (let [events-xform (comp (map events/parse-event)
+                            (remove nil?)
+                            stream/filter-txs
+                            (stream/add-binlog-filename (:filename binlog-pos))
+                            stream/group-table-maps)
+         events-ch    (chan 1 events-xform)
+         client       (new-binlog-client (:conf ctx)
+                                         binlog-pos
+                                         events-ch)]
      {:client client
       :out events-ch})))
 

@@ -50,6 +50,7 @@
   (last @out-rows)
   (go (println (<! (:out res))))
 
+  (def res (assoc-in res [:binlog-pos :position] 5830))
   (def stream-ctx (dumpr/stream-binlog context (:binlog-pos res)))
   (def out-events (sink-and-print (:out stream-ctx)))
   (count @out-events)
@@ -67,7 +68,11 @@
        first
        second
        :rows)
+
+  (require '[dumpr.stream :as stream])
+  (transduce stream/group-table-maps conj @out-events)
   )
+
 
 
 (comment
