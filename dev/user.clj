@@ -50,19 +50,14 @@
   (last @out-rows)
   (go (println (<! (:out res))))
 
-  (def res (assoc-in res [:binlog-pos :position] 1115830))
-  (def stream-ctx (dumpr/stream-binlog context (:binlog-pos res)))
+  (def stream-ctx (dumpr/binlog-stream context (:binlog-pos res)))
   (def out-events (sink-and-print (:out stream-ctx)))
+  (dumpr/start-binlog-stream stream-ctx)
+  (dumpr/close-binlog-stream stream-ctx)
+
   (count @out-events)
   (take 10 (drop 10 @out-events))
 
-  (.connect (:client stream-ctx) 1000)
-  (.disconnect (:client stream-ctx))
-
-
-  (require '[dumpr.stream :as stream])
-  (transduce stream/group-table-maps conj @out-events)
-  (transduce (map stream/convert-with-schema) conj @out-events)
   )
 
 

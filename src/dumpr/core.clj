@@ -4,12 +4,8 @@
             [taoensso.timbre :as log]
             [dumpr.query :as query]
             [dumpr.events :as events]
-            [dumpr.stream :as stream])
-  (:import [com.github.shyiko.mysql.binlog
-            BinaryLogClient
-            BinaryLogClient$EventListener
-            BinaryLogClient$LifecycleListener]
-           [com.github.shyiko.mysql.binlog.event EventType]))
+            [dumpr.stream :as stream]
+            [dumpr.binlog :as binlog]))
 
 (def ^:dynamic *parallel-table-loads* 2)
 (def load-buffer-default-size 1000)
@@ -38,36 +34,6 @@
     name-or-spec))
 
 
-(defn- lifecycle-listener [out]
-  (reify
-    BinaryLogClient$LifecycleListener
-    (onConnect [this client]
-      (log/info "BinaryLogClient connected"))
-    (onCommunicationFailure [this client ex]
-      (log/info (str "BinaryLogClient communication failure: " (.getMessage ex))))
-    (onEventDeserializationFailure [this client ex]
-      (log/info (str "BinaryLogClient event deserialization failure: " (.getMessage ex))))
-    (onDisconnect [this client]
-      (log/info "BinaryLogClient disconnected")
-      (async/close! out))))
-
-(defn- event-listener [out]
-  (reify
-    BinaryLogClient$EventListener
-    (onEvent [this payload]
-      (>!! out payload))))
-
-(defn- new-binlog-client [conf binlog-pos out & {:keys [filter-types]}]
-  (let [{:keys [host port user password server-id]} conf
-        {:keys [file position]}                     binlog-pos]
-    (doto (BinaryLogClient. host port user password)
-      (.setServerId server-id)
-      (.setBinlogPosition position)
-      (.setBinlogFilename file)
-      (.registerEventListener (event-listener out))
-      (.registerLifecycleListener (lifecycle-listener out)))))
-
-
 
 ;; Public API
 ;;
@@ -88,8 +54,8 @@
      {:out out
       :binlog-pos binlog-pos})))
 
-(defn stream-binlog
-  ([ctx binlog-pos] (stream-binlog ctx binlog-pos (chan stream-buffer-default-size)))
+(defn binlog-stream
+  ([ctx binlog-pos] (binlog-stream ctx binlog-pos (chan stream-buffer-default-size)))
   ([ctx binlog-pos out]
    (let [db-spec      (:db-spec ctx)
          events-xform (comp (map events/parse-event)
@@ -98,7 +64,7 @@
                             (stream/add-binlog-filename (:filename binlog-pos))
                             stream/group-table-maps)
          events-ch    (chan 1 events-xform)
-         client       (new-binlog-client (:conf ctx)
+         client       (binlog/new-binlog-client (:conf ctx)
                                          binlog-pos
                                          events-ch)]
      (async/pipeline-blocking 2
@@ -110,3 +76,9 @@
      {:client client
       :out out})))
 
+
+(defn start-binlog-stream [stream-ctx]
+  (binlog/start-client (:client stream-ctx)))
+
+(defn close-binlog-stream [stream-ctx]
+  (binlog/stop-client (:client stream-ctx)))
