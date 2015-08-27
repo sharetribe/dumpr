@@ -1,7 +1,8 @@
 (defproject dumpr "0.1.0-SNAPSHOT"
   :description "Library to consume MySQL contents as a stream of updates."
   :url "FIXME"
-
+  :license {:name "Eclipse Public License"
+            :url "http://www.eclipse.org/legal/epl-v10.html"}
   :source-paths ["src"]
 
   :dependencies [[org.clojure/clojure "1.7.0"]
@@ -12,11 +13,7 @@
                  [com.taoensso/timbre "4.1.1"]
                  [com.github.shyiko/mysql-binlog-connector-java "0.2.2"]]
 
+  :global-vars {*warn-on-reflection* true}
   :min-lein-version "2.5.0"
 
-  :uberjar-name "dumpr.jar"
-
-  :clean-targets ^{:protect false} ["./target"]
-
-  :profiles {:uberjar {:aot :all}
-             :dev {:source-paths ["dev"]}})
+  :profiles {:dev {:source-paths ["dev"]}})
