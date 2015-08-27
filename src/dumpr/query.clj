@@ -2,7 +2,8 @@
   "Functions to query data from MySQL and parse the query results."
   (:require [clojure.java.jdbc :as jdbc]
             [clojure.core.async :as async :refer [>!!]]
-            [taoensso.timbre :as log]))
+            [taoensso.timbre :as log]
+            [dumpr.row-format :as row-format]))
 
 
 (defn db-spec
@@ -34,20 +35,24 @@
                  :row-fn (fn [v]
                            ;; Block until output written to make sure
                            ;; we don't close DB connection too early.
-                           (>!! ch [table (id-fn v) v])
+                           (>!! ch (row-format/upsert table (id-fn v) v nil))
                            1)
                  :result-set-fn (partial reduce + 0))]
       (log/info "Loaded" count "rows from table" table))
     (async/close! ch)))
 
-(defn fetch-table-cols [db-spec db table]
+(defn fetch-table-cols
+  "Query table column metadata for db and table."
+  [db-spec db table]
   (jdbc/query
    db-spec
-   [" SELECT COLUMN_NAME, DATA_TYPE, COLUMN_KEY, CHARACTER_SET_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? and TABLE_NAME = ? ORDER BY ORDINAL_POSITION"
+   ["SELECT COLUMN_NAME, DATA_TYPE, COLUMN_KEY, CHARACTER_SET_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? and TABLE_NAME = ? ORDER BY ORDINAL_POSITION"
     db
     table]))
 
-(defn parse-table-schema [cols]
+(defn parse-table-schema
+  "Parse the cols column metadata into a table schema presentation."
+  [cols]
   (reduce
    (fn [schema {:keys [column_name data_type column_key character_set_name]}]
      (let [name (keyword column_name)

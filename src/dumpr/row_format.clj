@@ -5,7 +5,7 @@
 ;; Abstract Data Type for streamed rows
 ;;
 (defn upsert [table id content meta]
-  {:pre [(keyword? table) (some? id) (some? meta)]}
+  {:pre [(keyword? table) (some? id)]}
   [:upsert table id content meta])
 
 (defn delete [table id content meta]

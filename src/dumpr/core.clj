@@ -1,4 +1,5 @@
 (ns dumpr.core
+  "Dumpr API"
   (:require [clojure.java.jdbc :as jdbc]
             [clojure.core.async :as async :refer [chan >!!]]
             [taoensso.timbre :as log]
@@ -14,12 +15,6 @@
 
 
 
-(defn- ensure-table-spec [name-or-spec]
-  (if (keyword? name-or-spec)
-    {:table name-or-spec
-     :id-fn :id}
-    name-or-spec))
-
 (defn- schema-mapping-ex-handler [^Throwable ex]
   (let [exd  (ex-data ex)
         data (dissoc exd :meta)
@@ -32,33 +27,35 @@
 ;; Public API
 ;;
 
-(defn create [conf tables]
-  {:db-spec (query/db-spec conf) :conf conf :tables tables})
+(defn create-conf [conn-params]
+  {:db-spec (query/db-spec conn-params) :conn-params conn-params})
 
 (defn load-tables
-  ([ctx] (load-tables ctx (chan load-buffer-default-size)))
-  ([{:keys [db-spec tables]} out]
+  ([tables conf] (load-tables tables conf (chan load-buffer-default-size)))
+  ([tables {:keys [db-spec]} out]
    (let [binlog-pos (query/binlog-position db-spec)
          in         (chan 0)
          _          (async/pipeline-async *parallel-table-loads*
                                           out
-                                          (partial query/stream-table db-spec) ; TODO upserts
+                                          (partial query/stream-table db-spec)
                                           in)
-         _          (async/onto-chan in (map ensure-table-spec tables))]
+         _          (async/onto-chan in
+                                     (map (fn [t] {:table t :id-fn :id}) ; TODO Autodiscover id-fn using schema
+                                          tables))]
      {:out out
       :binlog-pos binlog-pos})))
 
 (defn binlog-stream
-  ([ctx binlog-pos] (binlog-stream ctx binlog-pos (chan stream-buffer-default-size)))
-  ([ctx binlog-pos out]
-   (let [db-spec      (:db-spec ctx)
+  ([conf binlog-pos] (binlog-stream conf binlog-pos (chan stream-buffer-default-size)))
+  ([conf binlog-pos out]
+   (let [db-spec      (:db-spec conf)
          events-xform (comp (map events/parse-event)
                             (remove nil?)
                             stream/filter-txs
                             (stream/add-binlog-filename (:filename binlog-pos))
                             stream/group-table-maps)
          events-ch    (chan 1 events-xform)
-         client       (binlog/new-binlog-client (:conf ctx)
+         client       (binlog/new-binlog-client (:conn-params conf)
                                          binlog-pos
                                          events-ch)]
      (async/pipeline-blocking 2
@@ -73,8 +70,8 @@
       :out out})))
 
 
-(defn start-binlog-stream [stream-ctx]
-  (binlog/start-client (:client stream-ctx)))
+(defn start-binlog-stream [stream]
+  (binlog/start-client (:client stream)))
 
-(defn close-binlog-stream [stream-ctx]
-  (binlog/stop-client (:client stream-ctx)))
+(defn close-binlog-stream [stream]
+  (binlog/stop-client (:client stream)))
