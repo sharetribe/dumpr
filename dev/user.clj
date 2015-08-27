@@ -1,6 +1,13 @@
 (ns user
   (:require [dumpr.core :as dumpr]
-            [clojure.core.async :as async :refer [<! go go-loop]]))
+            [clojure.core.async :as async :refer [<! go go-loop]]
+            [taoensso.timbre :as log]))
+
+(Thread/setDefaultUncaughtExceptionHandler
+ (reify Thread$UncaughtExceptionHandler
+   (uncaughtException [_ thread ex]
+     (log/error ex "Uncaught exception on" (.getName thread)))))
+
 
 (def db-spec
   {;; :subname "//127.0.0.1:3306/sharetribe_development?zeroDateTimeBehavior=convertToNull"
@@ -51,7 +58,7 @@
   (go (println (<! (:out res))))
 
   (def stream-ctx (dumpr/binlog-stream context (:binlog-pos res)))
-  (def out-events (sink-and-print (:out stream-ctx)))
+  (def out-events (sink (:out stream-ctx)))
   (dumpr/start-binlog-stream stream-ctx)
   (dumpr/close-binlog-stream stream-ctx)
 

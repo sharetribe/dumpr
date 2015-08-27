@@ -1,7 +1,8 @@
 (ns dumpr.stream
   "Transformations for the stream of parsed binlog events."
   (:require [clojure.core.async :as async]
-            [dumpr.query :as query]))
+            [dumpr.query :as query]
+            [dumpr.row-format :as row-format]))
 
 (defn- preserving-reduced
   [rf]
@@ -14,9 +15,9 @@
 
 (def filter-txs
   "A stateful transducer to filter away canceled
-  transactions. Internally batches tx's events and releases them all
-  at once on successful commit. Removes the events marking tx
-  boundaries."
+  transactions. Internally batches all events in a transaction and
+  releases them at once on successful commit. It removes the events
+  marking tx boundaries."
   (fn [rf]
     (let [ongoing? (volatile! false)
           tx       (volatile! [])
@@ -50,8 +51,8 @@
   "Build a stateful transducer to add binlog filename to all
   events. Normally the events data only contains binlog position. This
   transducer tracks the current filename, starting from init-filename,
-  and updates the filename from rotate events. Removes the rotate
-  events."
+  and updates the filename from rotate events. Transducer also removes
+  the rotate events."
   (fn [rf]
     (let [filename (volatile! init-filename)]
       (fn
@@ -84,27 +85,40 @@
                (rf result [input])))))))))    ; op without table map, just wrap
 
 
-;; TODO Table schema caching
-(defn- load-and-add-schema [db-spec table-map]
+(defn- validate-schema [schema table-map]
+  (let [{:keys [primary-key cols]} schema
+        {:keys [db table]}         (second table-map)
+        meta                       (nth table-map 2)]
+    (if-not (keyword? primary-key)
+      (throw
+       (ex-info "Invalid schema. Missing primary-key"
+                {:schema schema :db db :table table :meta meta}))
+      (if (empty? cols)
+        (throw (ex-info "Invalid schema. No columns."
+                        {:schema schema :db db :table table :meta meta}))
+        true))))
+
+(defn- load-schema-from-db [db-spec table-map]
   (let [{:keys [db table]} (second table-map)
         cols               (query/fetch-table-cols db-spec db table)]
-    (assoc-in table-map
-              [1 :schema]
-              (query/parse-table-schema cols))))
+    (query/parse-table-schema cols)))
 
+;; TODO Table schema caching
 (defn fetch-table-schema [db-spec event-pair]
   (let [[f s] event-pair]
     (if (= (first f) :table-map)
-      [(load-and-add-schema db-spec f) s]
+      (let [schema (load-schema-from-db db-spec f)
+            _      (validate-schema schema f)]
+        [(assoc-in f [1 :schema] schema) s])
       event-pair)))
 
-(defn- ->row-tuple
+(defn- ->row-format
   [row-data mutation-type table id-col col-names meta]
   (let [mapped-row (zipmap col-names row-data)
         id         (id-col mapped-row)]
     (if (= :delete mutation-type)
-      [:delete table id mapped-row meta]
-      [:upsert table id mapped-row meta])))
+      (row-format/delete table id mapped-row meta)
+      (row-format/upsert table id mapped-row meta))))
 
 (defn convert-with-schema
   "Given an event-pair of table-map and mutation (write/update/delete)
@@ -127,9 +141,10 @@
             rows      (-> mutation second :rows)
             meta      (nth mutation 2)]
         (map
-         #(->row-tuple % mutation-type table id-col col-names meta)
+         #(->row-format % mutation-type table id-col col-names meta)
          rows))
       (throw (ex-info
               (str "Expected event-pair starting with :table-map, got: "
                    (first table-map))
-              :event-pair event-pair)))))
+              :event-pair event-pair
+              :meta (-> event-pair first (nth 2)))))))

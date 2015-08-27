@@ -5,25 +5,12 @@
             [dumpr.query :as query]
             [dumpr.events :as events]
             [dumpr.stream :as stream]
-            [dumpr.binlog :as binlog]))
+            [dumpr.binlog :as binlog]
+            [dumpr.row-format :as row-format]))
 
 (def ^:dynamic *parallel-table-loads* 2)
 (def load-buffer-default-size 1000)
 (def stream-buffer-default-size 50)
-
-;; Abstract Data Type for streamed rows
-;;
-(defn upsert [table id content]
-  [:upsert table id content])
-
-(defn delete [table id]
-  [:delete table id])
-
-(defn upsert? [data]
-  (= (first data) :upsert))
-
-(defn delete? [data]
-  (= (first data) :delete))
 
 
 
@@ -33,6 +20,13 @@
      :id-fn :id}
     name-or-spec))
 
+(defn- schema-mapping-ex-handler [^Throwable ex]
+  (let [exd  (ex-data ex)
+        data (dissoc exd :meta)
+        meta (:meta exd)
+        msg  (.getMessage ex)]
+    (log/error "Error occurred with schema processing:" ex)
+    (row-format/error msg data meta)))
 
 
 ;; Public API
@@ -72,7 +66,9 @@
                               (comp (map #(stream/fetch-table-schema db-spec %))
                                     (map stream/convert-with-schema)
                                     cat)
-                              events-ch)
+                              events-ch
+                              true
+                              schema-mapping-ex-handler)
      {:client client
       :out out})))
 
