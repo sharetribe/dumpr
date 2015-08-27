@@ -1,0 +1,10 @@
+* TODO
+ - [ ] Handle out channel close by consumer in binlog streaming
+ - [ ] What happens if DB connection drops, can we reconnect?
+ - [ ] auto key detection on load
+ - [ ] stop event handling
+ - [ ] testing strategy
+ - [ ] channel metrics
+ - [ ] Test nexted tx?
+ - [ ] write good README
+ - [ ] decide licence and update
