@@ -1,6 +1,15 @@
 (ns dumpr.events
   "Parsing of native Binlog client event types to clojure data."
-  (:import [com.github.shyiko.mysql.binlog.event EventType]))
+  (:import [com.github.shyiko.mysql.binlog.event
+            EventType
+            EventHeaderV4
+            Event
+            TableMapEventData
+            DeleteRowsEventData
+            WriteRowsEventData
+            UpdateRowsEventData
+            RotateEventData
+            QueryEventData]))
 
 (def event-mappings
   {EventType/UNKNOWN            ::ev-unknown
@@ -40,7 +49,7 @@
    EventType/ANONYMOUS_GTID     ::ev-anonymous-gtid
    EventType/PREVIOUS_GTIDS     ::ev-previous-gtids})
 
-(defn header-parser [header]
+(defn header-parser [^EventHeaderV4 header]
   {:ts (-> header .getTimestamp java.util.Date.)
    :next-position (.getNextPosition header)})
 
@@ -53,7 +62,7 @@
 
   The final return type of an event-parser is:
   [parsed-event-type parsed-body parsed-header] or nil."
-  (fn [payload]
+  (fn [^Event payload]
     (let [header      (header-parser (.getHeader payload))
           body        (body-parser (.getData payload))
           [type data] body]
@@ -64,11 +73,11 @@
 ;; Body parsers for interesting event types
 ;;
 
-(defn rotate-parser [data]
+(defn rotate-parser [^RotateEventData data]
   [:rotate {:filename (.getBinlogFilename data)
             :position (.getBinlogPosition data)}])
 
-(defn query-parser [data]
+(defn query-parser [^QueryEventData data]
   (let [sql (.getSql data)
         database (.getDatabase data)]
     (condp re-matches (.toUpperCase sql)
@@ -80,21 +89,21 @@
 (defn xid-parser [data]
   [:tx-commit nil])
 
-(defn table-map-parser [data]
+(defn table-map-parser [^TableMapEventData data]
   [:table-map {:table-id (.getTableId data)
                :db       (.getDatabase data)
                :table    (.getTable data)}])
 
 
-(defn update-parser [data]
+(defn update-parser [^UpdateRowsEventData data]
   [:update {:table-id (.getTableId data)
             :rows     (into [] (for [[_ v] (.getRows data)] (into [] v)))}])
 
-(defn write-parser [data]
+(defn write-parser [^WriteRowsEventData data]
   [:write {:table-id (.getTableId data)
            :rows (into [] (map (partial into []) (.getRows data)))}])
 
-(defn delete-parser [data]
+(defn delete-parser [^DeleteRowsEventData data]
   [:delete {:table-id (.getTableId data)
             :rows (into [] (map (partial into []) (.getRows data)))}])
 
@@ -126,7 +135,7 @@
      ::ev-delete-rows delete}))
 
 
-(defn parse-event [payload]
+(defn parse-event [^Event payload]
   "Parse native Binlog client event to Clojure data. Returns nil if
   the event has no parsing logic defined."
   (when-let [parser (-> payload
@@ -135,3 +144,18 @@
                         event-mappings
                         event-parsers)]
     (parser payload)))
+
+(defn event-type
+  "Extract the event type keyword from event."
+  [event]
+  (first event))
+
+(defn event-meta
+  "Extract the metadata part of event."
+  [event]
+  (nth event 2))
+
+(defn event-data
+  "Extract the data part of event."
+  [event]
+  (second event))

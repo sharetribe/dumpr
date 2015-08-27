@@ -2,7 +2,8 @@
   "Transformations for the stream of parsed binlog events."
   (:require [clojure.core.async :as async]
             [dumpr.query :as query]
-            [dumpr.row-format :as row-format]))
+            [dumpr.row-format :as row-format]
+            [dumpr.events :as events]))
 
 (defn- preserving-reduced
   [rf]
@@ -34,7 +35,7 @@
         ([result] (rf result))
 
         ([result input]
-         (condp = (first input)
+         (condp = (events/event-type input)
            :tx-begin (do (start-tx)
                          result)
 
@@ -78,17 +79,17 @@
         ([result input]
          (let [prior @prev]
            (vreset! prev input)
-           (if (= (first input) :table-map)
+           (if (= (events/event-type input) :table-map)
              result                           ; Delay table-map events
-             (if (= (first prior) :table-map)
+             (if (= (events/event-type prior) :table-map)
                (rf result [prior input])      ; Return table-map op as pair
                (rf result [input])))))))))    ; op without table map, just wrap
 
 
 (defn- validate-schema [schema table-map]
   (let [{:keys [primary-key cols]} schema
-        {:keys [db table]}         (second table-map)
-        meta                       (nth table-map 2)]
+        {:keys [db table]}         (events/event-data table-map)
+        meta                       (events/event-meta table-map)]
     (if-not (keyword? primary-key)
       (throw
        (ex-info "Invalid schema. Missing primary-key"
@@ -99,14 +100,14 @@
         true))))
 
 (defn- load-schema-from-db [db-spec table-map]
-  (let [{:keys [db table]} (second table-map)
+  (let [{:keys [db table]} (events/event-data table-map)
         cols               (query/fetch-table-cols db-spec db table)]
     (query/parse-table-schema cols)))
 
 ;; TODO Table schema caching
 (defn fetch-table-schema [db-spec event-pair]
   (let [[f s] event-pair]
-    (if (= (first f) :table-map)
+    (if (= (events/event-type f) :table-map)
       (let [schema (load-schema-from-db db-spec f)
             _      (validate-schema schema f)]
         [(assoc-in f [1 :schema] schema) s])
@@ -131,20 +132,20 @@
     * meta - binlog position and ts from the source binlog event"
  [event-pair]
  (let [[table-map mutation] event-pair
-       mutation-type (first mutation)]
-    (if (and (= :table-map (first table-map))
+       mutation-type (events/event-type mutation)]
+    (if (and (= :table-map (events/event-type table-map))
              (#{:write :update :delete} mutation-type))
-      (let [table     (-> table-map second :table keyword)
-            schema    (-> table-map second :schema)
+      (let [table     (-> table-map events/event-data :table keyword)
+            schema    (-> table-map events/event-data :schema)
             id-col    (:primary-key schema)
             col-names (->> schema :cols (map :name))
-            rows      (-> mutation second :rows)
-            meta      (nth mutation 2)]
+            rows      (-> mutation events/event-data :rows)
+            meta      (events/event-meta mutation)]
         (map
          #(->row-format % mutation-type table id-col col-names meta)
          rows))
       (throw (ex-info
               (str "Expected event-pair starting with :table-map, got: "
-                   (first table-map))
+                   (events/event-type table-map))
               :event-pair event-pair
               :meta (-> event-pair first (nth 2)))))))

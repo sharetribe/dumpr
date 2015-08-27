@@ -43,8 +43,8 @@
     (.registerEventListener (event-listener out))
     (.registerLifecycleListener (lifecycle-listener out))))
 
-(defn start-client [client]
+(defn start-client [^BinaryLogClient client]
   (.connect client 1000))
 
-(defn stop-client [client]
+(defn stop-client [^BinaryLogClient client]
   (.disconnect client))
