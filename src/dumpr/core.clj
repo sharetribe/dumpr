@@ -9,7 +9,6 @@
             [dumpr.binlog :as binlog]
             [dumpr.row-format :as row-format]))
 
-(def ^:dynamic *parallel-table-loads* 2)
 (def load-buffer-default-size 1000)
 (def stream-buffer-default-size 50)
 
@@ -31,11 +30,23 @@
   {:db-spec (query/db-spec conn-params) :conn-params conn-params})
 
 (defn load-tables
+  "Load the contents of given tables from the DB and return the
+  results as :upsert rows via out channel. Tables are given as a
+  vector of table keywords. Keyword is mapped to table name using
+  (name table-kw). Loading happens in the order that tables were
+  given. Results are returned strictly in the order that tables were
+  given. Out channel can be specified if specific buffer size or
+  behavior is desired. Result map has following fields:
+
+  :out        The out chan for result rows. Closed when
+              all tabels are loaded
+  :binlog-pos Binlog position *before* table load started.
+              Use this to start binlog consuming."
   ([tables conf] (load-tables tables conf (chan load-buffer-default-size)))
   ([tables {:keys [db-spec]} out]
    (let [binlog-pos (query/binlog-position db-spec)
          in         (chan 0)
-         _          (async/pipeline-async *parallel-table-loads*
+         _          (async/pipeline-async 1
                                           out
                                           (partial query/stream-table db-spec)
                                           in)
