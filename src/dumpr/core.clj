@@ -4,6 +4,7 @@
             [clojure.core.async :as async :refer [chan >!!]]
             [taoensso.timbre :as log]
             [dumpr.query :as query]
+            [dumpr.table-schema :as table-schema]
             [dumpr.events :as events]
             [dumpr.stream :as stream]
             [dumpr.binlog :as binlog]
@@ -26,8 +27,10 @@
 ;; Public API
 ;;
 
-(defn create-conf [conn-params]
-  {:db-spec (query/db-spec conn-params) :conn-params conn-params})
+(defn create-conf [conn-params id-fns]
+  {:db-spec (query/db-spec conn-params)
+   :conn-params conn-params
+   :id-fns id-fns})
 
 (defn load-tables
   "Load the contents of given tables from the DB and return the
@@ -43,16 +46,21 @@
   :binlog-pos Binlog position *before* table load started.
               Use this to start binlog consuming."
   ([tables conf] (load-tables tables conf (chan load-buffer-default-size)))
-  ([tables {:keys [db-spec]} out]
-   (let [binlog-pos (query/binlog-position db-spec)
-         in         (chan 0)
-         _          (async/pipeline-async 1
-                                          out
-                                          (partial query/stream-table db-spec)
-                                          in)
-         _          (async/onto-chan in
-                                     (map (fn [t] {:table t :id-fn :id}) ; TODO Autodiscover id-fn using schema
-                                          tables))]
+  ([tables {:keys [db-spec conn-params id-fns]} out]
+   (let [db          (:db conn-params)
+         binlog-pos  (query/binlog-position db-spec)
+         tables-ch   (chan 0)
+         table-specs (chan 0)]
+     (async/onto-chan tables-ch (map #(table-schema/->table-spec % id-fns)
+                                     tables))
+     (async/pipeline-blocking 1
+                              table-specs
+                              (map #(table-schema/load-schema db-spec db %))
+                              tables-ch)
+     (async/pipeline-async 1
+                           out
+                           (partial query/stream-table db-spec)
+                           table-specs)
      {:out out
       :binlog-pos binlog-pos})))
 
