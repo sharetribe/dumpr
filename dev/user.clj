@@ -38,15 +38,14 @@
    :db "sharetribe_development"
    :server-id 123})
 
-(def id-fns
-  {:people :id})
-
 (comment
-  (def conf (dumpr/create-conf conn-params id-fns))
+  (def conf (dumpr/create-conf conn-params {:people :id}))
 
   (def res (dumpr/load-tables [:communities :people :listings] conf))
   (def out-rows (sink (:out res)))
   (count @out-rows)
+  (def out (sink (:out (dumpr/load-tables [:communities :people :listings] conf))))
+  (count @out)
   (table-schema/load-schema (:db-spec conf) "sharetribe_development" (first table-specs))
   (vec (take 2 (first @out-rows)))
   (last @out-rows)

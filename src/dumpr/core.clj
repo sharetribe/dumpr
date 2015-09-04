@@ -2,6 +2,7 @@
   "Dumpr API"
   (:require [clojure.java.jdbc :as jdbc]
             [clojure.core.async :as async :refer [chan >!!]]
+            [schema.core :as s]
             [taoensso.timbre :as log]
             [dumpr.query :as query]
             [dumpr.table-schema :as table-schema]
@@ -55,7 +56,7 @@
                                      tables))
      (async/pipeline-blocking 1
                               table-specs
-                              (map #(table-schema/load-schema db-spec db %))
+                              (map #(s/with-fn-validation (table-schema/load-schema db-spec db %)))
                               tables-ch)
      (async/pipeline-async 1
                            out

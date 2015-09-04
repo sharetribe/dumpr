@@ -5,7 +5,7 @@
 
 (def Col
   {:name s/Keyword
-   :type s/Str
+   :type s/Keyword
    :character-set (s/maybe s/Str)})
 
 (def TableSchema
@@ -19,7 +19,7 @@
 (def TableSpec
   "A partial schema specification for a table with optional id-fn."
   {:table s/Keyword
-   (s/optional-key :id-fn) (s/pred ifn?)})
+   (s/optional-key :id-fn) (s/maybe (s/pred ifn?))})
 
 (defn- parse-table-cols
   "Parse the cols column metadata into a table schema presentation."
