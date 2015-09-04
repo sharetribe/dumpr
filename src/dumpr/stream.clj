@@ -1,6 +1,7 @@
 (ns dumpr.stream
   "Transformations for the stream of parsed binlog events."
   (:require [clojure.core.async :as async]
+            [dumpr.table-schema :as table-schema]
             [dumpr.query :as query]
             [dumpr.row-format :as row-format]
             [dumpr.events :as events]))
@@ -105,18 +106,19 @@
     (query/parse-table-schema cols)))
 
 ;; TODO Table schema caching
-(defn fetch-table-schema [db-spec event-pair]
-  (let [[f s] event-pair]
-    (if (= (events/event-type f) :table-map)
-      (let [schema (load-schema-from-db db-spec f)
-            _      (validate-schema schema f)]
-        [(assoc-in f [1 :schema] schema) s])
-      event-pair)))
+(defn fetch-table-schema [db-spec id-fns event-pair]
+  (let [[table-map mutation] event-pair]
+    (if (= (events/event-type table-map) :table-map)
+      (let [{:keys [db table]} (events/event-data table-map)
+            table-spec (table-schema/->table-spec (keyword table) id-fns)
+            schema (table-schema/load-schema db-spec db table-spec)]
+        [(assoc-in table-map [1 :schema] schema) mutation])
+      table-map)))
 
 (defn- ->row-format
-  [row-data mutation-type table id-col col-names meta]
+  [row-data mutation-type table id-fn col-names meta]
   (let [mapped-row (zipmap col-names row-data)
-        id         (id-col mapped-row)]
+        id         (id-fn mapped-row)]
     (if (= :delete mutation-type)
       (row-format/delete table id mapped-row meta)
       (row-format/upsert table id mapped-row meta))))
@@ -137,12 +139,12 @@
              (#{:write :update :delete} mutation-type))
       (let [table     (-> table-map events/event-data :table keyword)
             schema    (-> table-map events/event-data :schema)
-            id-col    (:primary-key schema)
+            id-fn     (:id-fn schema)
             col-names (->> schema :cols (map :name))
             rows      (-> mutation events/event-data :rows)
             meta      (events/event-meta mutation)]
         (map
-         #(->row-format % mutation-type table id-col col-names meta)
+         #(->row-format % mutation-type table id-fn col-names meta)
          rows))
       (throw (ex-info
               (str "Expected event-pair starting with :table-map, got: "

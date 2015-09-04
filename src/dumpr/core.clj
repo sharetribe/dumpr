@@ -69,6 +69,7 @@
   ([conf binlog-pos] (binlog-stream conf binlog-pos (chan stream-buffer-default-size)))
   ([conf binlog-pos out]
    (let [db-spec      (:db-spec conf)
+         id-fns       (:id-fns conf)
          events-xform (comp (map events/parse-event)
                             (remove nil?)
                             stream/filter-txs
@@ -80,7 +81,7 @@
                                          events-ch)]
      (async/pipeline-blocking 2
                               out
-                              (comp (map #(stream/fetch-table-schema db-spec %))
+                              (comp (map #(stream/fetch-table-schema db-spec id-fns %))
                                     (map stream/convert-with-schema)
                                     cat)
                               events-ch

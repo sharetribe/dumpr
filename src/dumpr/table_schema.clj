@@ -11,7 +11,7 @@
 (def TableSchema
   "A schema for parsed table schema"
   {:table s/Keyword
-   :primary-key s/Keyword
+   :primary-key (s/maybe s/Keyword)
    :id-fn (s/pred ifn?)
    :cols [Col]}
 )
