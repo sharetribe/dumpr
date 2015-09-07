@@ -2,9 +2,11 @@
  - [X] Handle out channel close by consumer in binlog streaming => Not a good idea, use close-binlog-stream instead.
  - [X] Make table load parallelism configurable => Not configurable but still works with large datasets ok.
  - [X] Document order preserving table load behavior (making it official)
+ - [X] auto key detection on load + (manual override, if needed)
+ - [ ] Database filtering
+ - [ ] cache table schemas
  - [ ] Convert text type columns to strings using proper encoding
  - [ ] What happens if DB connection drops, can we reconnect?
- - [ ] auto key detection on load
  - [ ] stop event handling
  - [ ] testing strategy
  - [ ] channel metrics

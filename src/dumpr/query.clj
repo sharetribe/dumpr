@@ -28,7 +28,7 @@
   complete.."
   [db-spec {:keys [table id-fn]} ch]
   (async/thread
-    (log/info "Starting data load from table" table)
+    (log/info "Starting data load from table" table "id-fn:" id-fn)
     (let [count (jdbc/query
                  db-spec
                  [(str "SELECT * FROM " (name table))]

@@ -9,7 +9,7 @@
                  [org.clojure/core.async "0.1.346.0-17112a-alpha"]
                  [mysql/mysql-connector-java "5.1.36"]
                  [org.clojure/java.jdbc "0.4.1"]
-                 [clj-time "0.11.0"]
+                 [prismatic/schema "1.0.0"]
                  [com.taoensso/timbre "4.1.1"]
                  [com.github.shyiko/mysql-binlog-connector-java "0.2.2"]]
 

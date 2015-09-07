@@ -2,8 +2,10 @@
   "Dumpr API"
   (:require [clojure.java.jdbc :as jdbc]
             [clojure.core.async :as async :refer [chan >!!]]
+            [schema.core :as s]
             [taoensso.timbre :as log]
             [dumpr.query :as query]
+            [dumpr.table-schema :as table-schema]
             [dumpr.events :as events]
             [dumpr.stream :as stream]
             [dumpr.binlog :as binlog]
@@ -15,19 +17,32 @@
 
 
 (defn- schema-mapping-ex-handler [^Throwable ex]
-  (let [exd  (ex-data ex)
-        data (dissoc exd :meta)
-        meta (:meta exd)
-        msg  (.getMessage ex)]
-    (log/error "Error occurred with schema processing:" ex)
-    (row-format/error msg data meta)))
+  (let [exd  (ex-data ex)]
+    (if exd
+      (let [data (dissoc exd :meta)
+            meta (:meta exd)
+            msg  (.getMessage ex)]
+        (log/error "Error occurred with schema processing:" ex)
+        (row-format/error msg data meta))
+      (throw ex))))
 
 
 ;; Public API
 ;;
 
-(defn create-conf [conn-params]
-  {:db-spec (query/db-spec conn-params) :conn-params conn-params})
+(defn create-conf [conn-params id-fns]
+  "Create configuration needed by stream and table load.
+  Takes two params:
+
+  :conn-params Map that contains the following keys:
+               :user, :password, :host, :port, :db and :server-id
+  :id-fns      Maps table name (key) to function (value) that returns the
+               identifier value for that table row. Normally you'll be using
+               the identifier column as a keyword as the id function
+               (e.g. {:mytable :identifier})"
+  {:db-spec (query/db-spec conn-params)
+   :conn-params conn-params
+   :id-fns id-fns})
 
 (defn load-tables
   "Load the contents of given tables from the DB and return the
@@ -43,16 +58,18 @@
   :binlog-pos Binlog position *before* table load started.
               Use this to start binlog consuming."
   ([tables conf] (load-tables tables conf (chan load-buffer-default-size)))
-  ([tables {:keys [db-spec]} out]
-   (let [binlog-pos (query/binlog-position db-spec)
-         in         (chan 0)
-         _          (async/pipeline-async 1
-                                          out
-                                          (partial query/stream-table db-spec)
-                                          in)
-         _          (async/onto-chan in
-                                     (map (fn [t] {:table t :id-fn :id}) ; TODO Autodiscover id-fn using schema
-                                          tables))]
+  ([tables {:keys [db-spec conn-params id-fns]} out]
+   (let [db          (:db conn-params)
+         binlog-pos  (query/binlog-position db-spec)
+         tables-ch   (chan 0)
+         table-specs (chan 0)
+         schema-chan (table-schema/load-and-parse-schemas
+                      tables db-spec db id-fns)]
+
+     (async/pipeline-async 1
+                           out
+                           (partial query/stream-table db-spec)
+                           schema-chan)
      {:out out
       :binlog-pos binlog-pos})))
 
@@ -60,6 +77,7 @@
   ([conf binlog-pos] (binlog-stream conf binlog-pos (chan stream-buffer-default-size)))
   ([conf binlog-pos out]
    (let [db-spec      (:db-spec conf)
+         id-fns       (:id-fns conf)
          events-xform (comp (map events/parse-event)
                             (remove nil?)
                             stream/filter-txs
@@ -71,7 +89,7 @@
                                          events-ch)]
      (async/pipeline-blocking 2
                               out
-                              (comp (map #(stream/fetch-table-schema db-spec %))
+                              (comp (map #(stream/fetch-table-schema db-spec id-fns %))
                                     (map stream/convert-with-schema)
                                     cat)
                               events-ch
