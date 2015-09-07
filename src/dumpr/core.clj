@@ -30,7 +30,7 @@
 ;; Public API
 ;;
 
-(defn create-conf [conn-params id-fns]
+(defn create-conf
   "Create configuration needed by stream and table load.
   Takes two params:
 
@@ -40,6 +40,7 @@
                identifier value for that table row. Normally you'll be using
                the identifier column as a keyword as the id function
                (e.g. {:mytable :identifier})"
+  [conn-params id-fns]
   {:db-spec (query/db-spec conn-params)
    :conn-params conn-params
    :id-fns id-fns})
