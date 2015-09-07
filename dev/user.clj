@@ -51,7 +51,8 @@
   (last @out-rows)
   (go (println (<! (:out res))))
 
-  (def stream (dumpr/binlog-stream conf (:binlog-pos res)))
+  (def stream-conf (dumpr/create-conf conn-params {:people :id}))
+  (def stream (dumpr/binlog-stream stream-conf (:binlog-pos res)))
   (def out-events (sink (:out stream)))
   (dumpr/start-binlog-stream stream)
   (dumpr/close-binlog-stream stream)

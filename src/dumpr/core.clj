@@ -17,12 +17,14 @@
 
 
 (defn- schema-mapping-ex-handler [^Throwable ex]
-  (let [exd  (ex-data ex)
-        data (dissoc exd :meta)
-        meta (:meta exd)
-        msg  (.getMessage ex)]
-    (log/error "Error occurred with schema processing:" ex)
-    (row-format/error msg data meta)))
+  (let [exd  (ex-data ex)]
+    (if exd
+      (let [data (dissoc exd :meta)
+            meta (:meta exd)
+            msg  (.getMessage ex)]
+        (log/error "Error occurred with schema processing:" ex)
+        (row-format/error msg data meta))
+      (throw ex))))
 
 
 ;; Public API

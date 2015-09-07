@@ -1,6 +1,7 @@
 (ns dumpr.stream
   "Transformations for the stream of parsed binlog events."
   (:require [clojure.core.async :as async]
+            [schema.core :as s]
             [dumpr.table-schema :as table-schema]
             [dumpr.query :as query]
             [dumpr.row-format :as row-format]
@@ -111,8 +112,15 @@
     (if (= (events/event-type table-map) :table-map)
       (let [{:keys [db table]} (events/event-data table-map)
             table-spec (table-schema/->table-spec (keyword table) id-fns)
-            schema (table-schema/load-schema db-spec db table-spec)]
-        [(assoc-in table-map [1 :schema] schema) mutation])
+            schema (table-schema/load-schema db-spec db table-spec)
+            validation-error (s/check table-schema/TableSchema schema)]
+        (if validation-error
+          (throw (ex-info "Invalid schema"
+                          {:schema schema
+                           :db db
+                           :table table
+                           :meta {:table-map (events/event-meta table-map) :error validation-error}}))
+          [(assoc-in table-map [1 :schema] schema) mutation]))
       table-map)))
 
 (defn- ->row-format
