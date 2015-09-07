@@ -1,6 +1,7 @@
 (ns dumpr.table-schema
   "Parsing and manipulating the table schema"
   (:require [schema.core :as s]
+            [clojure.core.async :as async :refer [chan]]
             [dumpr.query :as query]))
 
 (def Col
@@ -53,3 +54,13 @@
   [table :- s/Keyword
    id-fns :- {}]
   {:table table :id-fn (id-fns table)})
+
+(defn load-and-parse-schemas
+  [tables db-spec db id-fns]
+  (let [out         (chan 0)
+        xform       (comp
+                     (map #(->table-spec % id-fns))
+                     (map #(s/with-fn-validation (load-schema db-spec db %))))
+        schemas     (transduce xform conj [] tables)]
+    (async/onto-chan out schemas)
+    out))

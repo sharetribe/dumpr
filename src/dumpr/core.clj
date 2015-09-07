@@ -62,17 +62,14 @@
    (let [db          (:db conn-params)
          binlog-pos  (query/binlog-position db-spec)
          tables-ch   (chan 0)
-         table-specs (chan 0)]
-     (async/onto-chan tables-ch (map #(table-schema/->table-spec % id-fns)
-                                     tables))
-     (async/pipeline-blocking 1
-                              table-specs
-                              (map #(s/with-fn-validation (table-schema/load-schema db-spec db %)))
-                              tables-ch)
+         table-specs (chan 0)
+         schema-chan (table-schema/load-and-parse-schemas
+                      tables db-spec db id-fns)]
+
      (async/pipeline-async 1
                            out
                            (partial query/stream-table db-spec)
-                           table-specs)
+                           schema-chan)
      {:out out
       :binlog-pos binlog-pos})))
 
