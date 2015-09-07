@@ -31,6 +31,15 @@
 ;;
 
 (defn create-conf [conn-params id-fns]
+  "Create configuration needed by stream and table load.
+  Takes two params:
+
+  :conn-params Map that contains the following keys:
+               :user, :password, :host, :port, :db and :server-id
+  :id-fns      Maps table name (key) to function (value) that returns the
+               identifier value for that table row. Normally you'll be using
+               the identifier column as a keyword as the id function
+               (e.g. {:mytable :identifier})"
   {:db-spec (query/db-spec conn-params)
    :conn-params conn-params
    :id-fns id-fns})
