@@ -123,7 +123,7 @@
           [(assoc-in table-map [1 :schema] schema) mutation]))
       table-map)))
 
-(defn convert-text [col val]
+(defn convert-text [col #^bytes val]
   (when val (String. val (java.nio.charset.Charset/forName (:character-set col)))))
 
 (defmulti convert-type :type)
