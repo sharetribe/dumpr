@@ -87,6 +87,9 @@
                (rf result [prior input])      ; Return table-map op as pair
                (rf result [input])))))))))    ; op without table map, just wrap
 
+(defn ->db [event-pair]
+  (let [[[event-type event-body]] event-pair]
+    (:db event-body)))
 
 (defn- validate-schema [schema table-map]
   (let [{:keys [primary-key cols]} schema

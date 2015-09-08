@@ -78,12 +78,14 @@
   ([conf binlog-pos] (binlog-stream conf binlog-pos (chan stream-buffer-default-size)))
   ([conf binlog-pos out]
    (let [db-spec      (:db-spec conf)
+         db           (get-in conf [:conn-params :db])
          id-fns       (:id-fns conf)
          events-xform (comp (map events/parse-event)
                             (remove nil?)
                             stream/filter-txs
                             (stream/add-binlog-filename (:filename binlog-pos))
-                            stream/group-table-maps)
+                            stream/group-table-maps
+                            (filter #(= (stream/->db %) db)))
          events-ch    (chan 1 events-xform)
          client       (binlog/new-binlog-client (:conn-params conf)
                                          binlog-pos
