@@ -124,7 +124,9 @@
       table-map)))
 
 (defn convert-text [col #^bytes val]
-  (when val (String. val (java.nio.charset.Charset/forName (:character-set col)))))
+  (when val
+    (String. val
+             (java.nio.charset.Charset/forName (:character-set col)))))
 
 (defmulti convert-type :type)
 (defmethod convert-type :tinytext   [col val] (convert-text col val))
