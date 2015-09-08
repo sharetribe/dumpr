@@ -136,11 +136,9 @@
 (defmethod convert-type :default    [col val] val)
 
 (defn- ->name-value [cols row-data]
-  (let [cols-and-row-data (map vector cols row-data)
-        typed-row         (map
-                           #(vector (:name (first %)) (apply convert-type %))
-                           cols-and-row-data)]
-    (into {} typed-row)))
+  (let [cols-names (map :name cols)
+        row-data (map convert-type cols row-data)]
+    (zipmap cols-names row-data)))
 
 (defn- ->row-format
   [row-data mutation-type table id-fn cols meta]
