@@ -123,10 +123,15 @@
           [(assoc-in table-map [1 :schema] schema) mutation]))
       table-map)))
 
-(defmulti convert-type :type)
-(defmethod convert-type :text [col val]
+(defn convert-text [col val]
   (when val (String. val (java.nio.charset.Charset/forName (:character-set col)))))
-(defmethod convert-type :default [col val] val)
+
+(defmulti convert-type :type)
+(defmethod convert-type :tinytext   [col val] (convert-text col val))
+(defmethod convert-type :text       [col val] (convert-text col val))
+(defmethod convert-type :mediumtext [col val] (convert-text col val))
+(defmethod convert-type :longtext   [col val] (convert-text col val))
+(defmethod convert-type :default    [col val] val)
 
 (defn- ->name-value [cols row-data]
   (let [cols-and-row-data (map vector cols row-data)
