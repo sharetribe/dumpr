@@ -103,10 +103,9 @@
 
 (defn- load-schema-from-db [db-spec table-map]
   (let [{:keys [db table]} (events/event-data table-map)
-        cols               (query/fetch-table-cols db-spec db table)]
+        cols               (query/table-cols-from-memo db-spec db table)]
     (query/parse-table-schema cols)))
 
-;; TODO Table schema caching
 (defn fetch-table-schema [db-spec id-fns event-pair]
   (let [[table-map mutation] event-pair]
     (if (= (events/event-type table-map) :table-map)

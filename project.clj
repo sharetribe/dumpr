@@ -11,6 +11,7 @@
                  [org.clojure/java.jdbc "0.4.1"]
                  [prismatic/schema "1.0.0"]
                  [com.taoensso/timbre "4.1.1"]
+                 [org.clojure/core.memoize "0.5.6"]
                  [com.github.shyiko/mysql-binlog-connector-java "0.2.2"]]
 
   :global-vars {*warn-on-reflection* true}
