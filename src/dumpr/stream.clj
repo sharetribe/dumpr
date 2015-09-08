@@ -123,9 +123,26 @@
           [(assoc-in table-map [1 :schema] schema) mutation]))
       table-map)))
 
+(defn convert-text [col #^bytes val]
+  (when val
+    (String. val
+             (java.nio.charset.Charset/forName (:character-set col)))))
+
+(defmulti convert-type :type)
+(defmethod convert-type :tinytext   [col val] (convert-text col val))
+(defmethod convert-type :text       [col val] (convert-text col val))
+(defmethod convert-type :mediumtext [col val] (convert-text col val))
+(defmethod convert-type :longtext   [col val] (convert-text col val))
+(defmethod convert-type :default    [col val] val)
+
+(defn- ->name-value [cols row-data]
+  (let [cols-names (map :name cols)
+        row-data (map convert-type cols row-data)]
+    (zipmap cols-names row-data)))
+
 (defn- ->row-format
-  [row-data mutation-type table id-fn col-names meta]
-  (let [mapped-row (zipmap col-names row-data)
+  [row-data mutation-type table id-fn cols meta]
+  (let [mapped-row   (->name-value cols row-data)
         id         (id-fn mapped-row)]
     (if (= :delete mutation-type)
       (row-format/delete table id mapped-row meta)
@@ -148,11 +165,11 @@
       (let [table     (-> table-map events/event-data :table keyword)
             schema    (-> table-map events/event-data :schema)
             id-fn     (:id-fn schema)
-            col-names (->> schema :cols (map :name))
+            cols      (:cols schema)
             rows      (-> mutation events/event-data :rows)
             meta      (events/event-meta mutation)]
         (map
-         #(->row-format % mutation-type table id-fn col-names meta)
+         #(->row-format % mutation-type table id-fn cols meta)
          rows))
       (throw (ex-info
               (str "Expected event-pair starting with :table-map, got: "
