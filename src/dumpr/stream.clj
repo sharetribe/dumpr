@@ -135,10 +135,10 @@
 
 (defn- ->name-value [cols row-data]
   (let [cols-and-row-data (map vector cols row-data)
-        typed-row         (map #(vector (:name (first %)) (apply convert-type %)) cols-and-row-data)]
-        (into {} typed-row)
-    )
-  )
+        typed-row         (map
+                           #(vector (:name (first %)) (apply convert-type %))
+                           cols-and-row-data)]
+    (into {} typed-row)))
 
 (defn- ->row-format
   [row-data mutation-type table id-fn cols meta]
