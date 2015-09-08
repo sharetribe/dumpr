@@ -2,6 +2,7 @@
   "Functions to query data from MySQL and parse the query results."
   (:require [clojure.java.jdbc :as jdbc]
             [clojure.core.async :as async :refer [>!!]]
+            [clojure.core.memoize :as memoize :refer [memo memo-clear!]]
             [taoensso.timbre :as log]
             [dumpr.row-format :as row-format]))
 
@@ -49,6 +50,18 @@
    ["SELECT COLUMN_NAME, DATA_TYPE, COLUMN_KEY, CHARACTER_SET_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? and TABLE_NAME = ? ORDER BY ORDINAL_POSITION"
     db
     table]))
+
+(def table-cols-from-memo
+  "Get the table column metadata for db and table from
+  memory, if possible. Otherwise do `fetch-table-cols`.
+
+  Use `clear-cols-memo!` to clear the memory"
+  (memo fetch-table-cols))
+
+(defn clear-cols-memo!
+  "Clears column metadata memo"
+  []
+  (memo-clear! table-cols-from-memo))
 
 (defn parse-table-schema
   "Parse the cols column metadata into a table schema presentation."

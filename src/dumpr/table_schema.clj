@@ -43,7 +43,7 @@
    db :- s/Str
    table-spec :- TableSpec]
   (let [{:keys [table id-fn]} table-spec
-        schema-info           (-> (query/fetch-table-cols db-spec db (name table))
+        schema-info           (-> (query/table-cols-from-memo db-spec db (name table))
                                   parse-table-cols)]
     (-> schema-info
         (assoc :table table)
