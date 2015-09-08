@@ -16,6 +16,7 @@
   :global-vars {*warn-on-reflection* true}
   :min-lein-version "2.5.0"
 
-  :profiles {:dev {:source-paths ["dev"]
+  :profiles {:dev {:source-paths ["config" "dev"]
                    :dependencies [[com.stuartsierra/component "0.2.3"]
-                                  [reloaded.repl "0.2.0"]]}})
+                                  [reloaded.repl "0.2.0"]
+                                  [io.aviso/config "0.1.7"]]}})
