@@ -85,7 +85,7 @@
                             stream/filter-txs
                             (stream/add-binlog-filename (:filename binlog-pos))
                             stream/group-table-maps
-                            (filter #(= (stream/->db %) db)))
+                            (stream/filter-database db))
          events-ch    (chan 1 events-xform)
          client       (binlog/new-binlog-client (:conn-params conf)
                                          binlog-pos
