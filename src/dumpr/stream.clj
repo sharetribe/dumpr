@@ -1,6 +1,6 @@
 (ns dumpr.stream
   "Transformations for the stream of parsed binlog events."
-  (:require [clojure.core.async :as async]
+  (:require [clojure.core.async :as async :refer [go-loop <! >!]]
             [schema.core :as s]
             [dumpr.table-schema :as table-schema]
             [dumpr.query :as query]
@@ -97,46 +97,71 @@
   [expected-db]
   (filter #(= (->db %) expected-db)))
 
+(defn- clear-schema-cache! [schema-cache]
+  (reset! schema-cache {}))
+
+(defn- get-from-cache [schema-cache table]
+  (@schema-cache (keyword table)))
+
+(defn- add-to-cache! [schema-cache table schema]
+  (swap! schema-cache assoc (keyword table) schema))
+
 
 (defn- validate-schema [schema table-map]
-  (let [{:keys [primary-key cols]} schema
-        {:keys [db table]}         (events/event-data table-map)
-        meta                       (events/event-meta table-map)]
-    (if-not (keyword? primary-key)
-      (throw
-       (ex-info "Invalid schema. Missing primary-key"
-                {:schema schema :db db :table table :meta meta}))
-      (if (empty? cols)
-        (throw (ex-info "Invalid schema. No columns."
-                        {:schema schema :db db :table table :meta meta}))
-        true))))
+  (let [{:keys [db table]}         (events/event-data table-map)
+        meta                       (events/event-meta table-map)
+        validation-error (s/check table-schema/TableSchema schema)]
+    (if validation-error
+      (throw (ex-info "Invalid schema"
+                      {:schema schema
+                       :db db
+                       :table table
+                       :meta {:table-map meta :error validation-error}}))
+      true)))
 
-(defn fetch-table-schema [db-spec id-fns cache event-pair]
+(defn- validation-error [schema]
+  (s/check table-schema/TableSchema schema))
+
+(defn- valid-schema? [schema]
+  (nil? (validation-error schema)))
+
+(defn- fetch-table-schema [table db db-spec id-fns schema-cache]
+  (if-let [schema (get-from-cache schema-cache table)]
+    schema
+    (let [table-spec (table-schema/->table-spec (keyword table) id-fns)
+          schema     (table-schema/load-schema db-spec db table-spec)]
+      (add-to-cache! schema-cache table schema)
+      schema)))
+
+(defn with-table-schema
+  [event-pair db-spec id-fns schema-cache]
   (let [[table-map mutation] event-pair]
     (if (= (events/event-type table-map) :table-map)
       (let [{:keys [db table]} (events/event-data table-map)
-            from-cache ((keyword table) @cache)
-            schema
-            (if from-cache
-              (do
-                (print (str "CACHE HIT FOR TABLE " table))
-                from-cache)
-              (do
-                (print (str "Cache miss :( for table " table))
-                (let [table-spec (table-schema/->table-spec (keyword table) id-fns)
-                      schema (table-schema/load-schema db-spec db table-spec)
-                      validation-error (s/check table-schema/TableSchema schema)]
-                  (if validation-error
-                    (throw (ex-info "Invalid schema"
-                                    {:schema schema
-                                     :db db
-                                     :table table
-                                     :meta {:table-map (events/event-meta table-map) :error validation-error}}))
-                    (do
-                      (swap! cache assoc (keyword table) schema)
-                      schema)))))]
-        [(assoc-in table-map [1 :schema] schema) mutation])
+            schema             (fetch-table-schema table db db-spec id-fns schema-cache)]
+        (if (valid-schema? schema)
+          [(assoc-in table-map [1 :schema] schema) mutation]
+          [(row-format/error "Invalid schema"
+                             {:schema schema :db db :table table}
+                             {:table-meta (events/event-meta table-map)
+                              :error (validation-error schema)})]))
       table-map)))
+
+(defn add-table-schema
+  "Processes event-pairs from in channel and adds a schema to the
+  table-map event in case the first event is a table-map. Writes
+  resulting enriched event-pairs to out channel. If the event-pair
+  contains a :alter-table event then that event is filtered and schema
+  cache is cleared."
+  [out in {:keys [db-spec id-fns schema-cache]}]
+  (go-loop []
+    (when-some [event-pair (<! in)]
+      (let [[table-map _] event-pair]
+        (if (= (events/event-type table-map) :alter-table)
+          (do (clear-schema-cache! schema-cache)
+              (recur))
+          (do (>! out (with-table-schema event-pair db-spec id-fns schema-cache))
+              (recur)))))))
 
 (defn convert-text [col #^bytes val]
   (when val
@@ -186,8 +211,4 @@
         (map
          #(->row-format % mutation-type table id-fn cols meta)
          rows))
-      (throw (ex-info
-              (str "Expected event-pair starting with :table-map, got: "
-                   (events/event-type table-map))
-              :event-pair event-pair
-              :meta (-> event-pair first (nth 2)))))))
+      event-pair)))

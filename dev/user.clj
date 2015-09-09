@@ -11,8 +11,8 @@
      (log/error ex "Uncaught exception on" (.getName thread)))))
 
 
-;; (reloaded.repl/set-init! #(system/only-stream {:file "Tamma-bin.000007", :position 3824}))
-(reloaded.repl/set-init! #(system/with-initial-load))
+(reloaded.repl/set-init! #(system/only-stream {:file "Tamma-bin.000007" :position 13205}))
+;; (reloaded.repl/set-init! #(system/with-initial-load))
 
 (defn reset []
   (reloaded.repl/reset))
@@ -31,7 +31,6 @@
   (-> system :streamer :out-events deref last)
   (-> system :streamer :out-events deref)
   (-> system :streamer :binlog-pos)
-
   )
 
 
