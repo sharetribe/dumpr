@@ -29,6 +29,7 @@
   (-> system :streamer :out-events deref count)
   (-> system :streamer :out-events deref first)
   (-> system :streamer :out-events deref last)
+  (-> system :streamer :out-events deref)
   (-> system :streamer :binlog-pos)
 
   )

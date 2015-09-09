@@ -53,7 +53,7 @@
   {:ts (-> header .getTimestamp java.util.Date.)
    :next-position (.getNextPosition header)})
 
-(defn event-parser [body-parser]
+(defn event-parser
   "Build an event parser from the given body parser by adding the
   standard header parsing functionality. Body parser must return a
   tuple of [parsed-event-type parsed-event-data] or nil. In case of
@@ -62,6 +62,7 @@
 
   The final return type of an event-parser is:
   [parsed-event-type parsed-body parsed-header] or nil."
+  [body-parser]
   (fn [^Event payload]
     (let [header      (header-parser (.getHeader payload))
           body        (body-parser (.getData payload))
@@ -78,12 +79,12 @@
             :position (.getBinlogPosition data)}])
 
 (defn query-parser [^QueryEventData data]
-  (let [sql (.getSql data)
-        database (.getDatabase data)]
-    (condp re-matches (.toUpperCase sql)
-      #"^BEGIN"    [:tx-begin nil]
-      #"^ROLLBACK" [:tx-rollback nil]
-      #"^COMMIT"   [:tx-commit nil]
+  (let [sql        (.getSql data)
+        event-data {:db (.getDatabase data)}]
+    (condp re-find (.toUpperCase sql)
+      #"^BEGIN"    [:tx-begin event-data]
+      #"^ROLLBACK" [:tx-rollback event-data]
+      #"^COMMIT"   [:tx-commit event-data]
       nil)))
 
 (defn xid-parser [data]
