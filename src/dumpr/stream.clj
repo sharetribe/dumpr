@@ -155,13 +155,14 @@
   cache is cleared."
   [out in {:keys [db-spec id-fns schema-cache]}]
   (go-loop []
-    (when-some [event-pair (<! in)]
+    (if-some [event-pair (<! in)]
       (let [[table-map _] event-pair]
         (if (= (events/event-type table-map) :alter-table)
           (do (clear-schema-cache! schema-cache)
               (recur))
           (do (>! out (with-table-schema event-pair db-spec id-fns schema-cache))
-              (recur)))))))
+              (recur))))
+      (async/close! out))))
 
 (defn convert-text [col #^bytes val]
   (when val
