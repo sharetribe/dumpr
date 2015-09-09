@@ -15,18 +15,6 @@
 (def stream-buffer-default-size 50)
 
 
-
-(defn- schema-mapping-ex-handler [^Throwable ex]
-  (let [exd  (ex-data ex)]
-    (if exd
-      (let [data (dissoc exd :meta)
-            meta (:meta exd)
-            msg  (.getMessage ex)]
-        (log/error "Error occurred with schema processing:" ex)
-        (row-format/error msg data meta))
-      (throw ex))))
-
-
 ;; Public API
 ;;
 
@@ -77,27 +65,31 @@
 (defn binlog-stream
   ([conf binlog-pos] (binlog-stream conf binlog-pos (chan stream-buffer-default-size)))
   ([conf binlog-pos out]
-   (let [db-spec      (:db-spec conf)
-         db           (get-in conf [:conn-params :db])
-         id-fns       (:id-fns conf)
-         events-xform (comp (map events/parse-event)
-                            (remove nil?)
-                            stream/filter-txs
-                            (stream/add-binlog-filename (:filename binlog-pos))
-                            stream/group-table-maps
-                            (stream/filter-database db))
-         events-ch    (chan 1 events-xform)
-         client       (binlog/new-binlog-client (:conn-params conf)
-                                         binlog-pos
-                                         events-ch)]
-     (async/pipeline-blocking 2
-                              out
-                              (comp (map #(stream/fetch-table-schema db-spec id-fns %))
-                                    (map stream/convert-with-schema)
-                                    cat)
+   (let [db-spec          (:db-spec conf)
+         db               (get-in conf [:conn-params :db])
+         id-fns           (:id-fns conf)
+         schema-cache     (atom {})
+         events-xform     (comp (map events/parse-event)
+                                (remove nil?)
+                                stream/filter-txs
+                                (stream/add-binlog-filename (:filename binlog-pos))
+                                stream/group-table-maps
+                                (stream/filter-database db))
+         events-ch        (chan 1 events-xform)
+         schema-loaded-ch (chan 1)
+         client           (binlog/new-binlog-client (:conn-params conf)
+                                                    binlog-pos
+                                                    events-ch)]
+     (stream/add-table-schema schema-loaded-ch
                               events-ch
-                              true
-                              schema-mapping-ex-handler)
+                              {:schema-cache schema-cache
+                               :db-spec db-spec
+                               :id-fns id-fns})
+     (async/pipeline 4
+                     out
+                     (comp (map stream/convert-with-schema)
+                           cat)
+                     schema-loaded-ch)
      {:client client
       :out out})))
 

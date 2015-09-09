@@ -82,9 +82,10 @@
   (let [sql        (.getSql data)
         event-data {:db (.getDatabase data)}]
     (condp re-find (.toUpperCase sql)
-      #"^BEGIN"    [:tx-begin event-data]
-      #"^ROLLBACK" [:tx-rollback event-data]
-      #"^COMMIT"   [:tx-commit event-data]
+      #"^BEGIN"       [:tx-begin event-data]
+      #"^ROLLBACK"    [:tx-rollback event-data]
+      #"^COMMIT"      [:tx-commit event-data]
+      #"^ALTER TABLE" [:alter-table event-data]
       nil)))
 
 (defn xid-parser [data]
