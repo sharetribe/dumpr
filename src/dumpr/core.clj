@@ -80,6 +80,7 @@
    (let [db-spec      (:db-spec conf)
          db           (get-in conf [:conn-params :db])
          id-fns       (:id-fns conf)
+         schema-cache (atom {})
          events-xform (comp (map events/parse-event)
                             (remove nil?)
                             stream/filter-txs
@@ -87,15 +88,27 @@
                             stream/group-table-maps
                             (stream/filter-database db))
          events-ch    (chan 1 events-xform)
+         cache-cleaner-ch (chan 1)
          client       (binlog/new-binlog-client (:conn-params conf)
                                          binlog-pos
                                          events-ch)]
+     (async/pipeline 1
+                       cache-cleaner-ch
+                       (comp
+                        (map #(do (when (= (events/event-type (first %)) :alter-table)
+                                    (reset! schema-cache {}))
+                                  %))
+                        (remove #(= (events/event-type (first %)) :alter-table)))
+                       events-ch
+                       true
+                       )
+
      (async/pipeline-blocking 2
                               out
-                              (comp (map #(stream/fetch-table-schema db-spec id-fns %))
+                              (comp (map #(stream/fetch-table-schema db-spec id-fns schema-cache %))
                                     (map stream/convert-with-schema)
                                     cat)
-                              events-ch
+                              cache-cleaner-ch
                               true
                               schema-mapping-ex-handler)
      {:client client
