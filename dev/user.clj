@@ -11,7 +11,7 @@
      (log/error ex "Uncaught exception on" (.getName thread)))))
 
 
-(reloaded.repl/set-init! #(system/only-stream {:file "Tamma-bin.000007" :position 13205}))
+(reloaded.repl/set-init! #(system/only-stream {:file nil :position 0}))
 ;; (reloaded.repl/set-init! #(system/with-initial-load))
 
 (defn reset []
