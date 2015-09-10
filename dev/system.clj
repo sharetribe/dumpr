@@ -61,7 +61,8 @@
   (start [this]
     (if-not (some? (:stream this))
       (let [binlog-pos (or (:binlog-pos this)
-                           (-> loader :result :binlog-pos))
+                           (-> loader :result :binlog-pos)
+                           nil)
             stream (dumpr/binlog-stream conf binlog-pos)
             out-events (sink (:out stream))]
         (dumpr/start-binlog-stream stream)
