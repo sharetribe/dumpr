@@ -71,9 +71,9 @@
             (assoc :stream stream)))))
 
   (stop [this]
-    (if (some? (:stream this))
-      (dumpr/close-binlog-stream (:stream this))
-      (dissoc this :stream))))
+    (when (some? (:stream this))
+      (dumpr/close-binlog-stream (:stream this)))
+    (dissoc this :stream)))
 
 (defn create-stream-continue [conf binlog-pos]
   (map->Stream {:conf conf :binlog-pos binlog-pos}))
