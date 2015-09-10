@@ -7,16 +7,20 @@
 
 (s/defschema LibConf
   "Schema for the library configuration for dev/tests."
-  {:conn-params {(s/optional-key :subname) s/Str
-                 :user s/Str
-                 :password s/Str
-                 :host s/Str
-                 :port s/Int
-                 :db s/Str
-                 :server-id s/Int}
-   :id-fns {s/Keyword (s/pred ifn?)}
-   :tables [s/Keyword]
-   :filter-tables #{s/Keyword}})
+  {:conn-params   {(s/optional-key :subname) s/Str
+                   :user s/Str
+                   :password s/Str
+                   :host s/Str
+                   :port s/Int
+                   :db s/Str
+                   :server-id s/Int}
+   :id-fns        {s/Keyword (s/pred ifn?)}
+   :tables        [s/Keyword]
+   :filter-tables #{s/Keyword}
+   :joplin        {:migrators {s/Keyword s/Str}
+                   :databases {s/Keyword {:type s/Keyword
+                                          :url s/Str}}
+                   :environments {s/Keyword [s/Any]}}})
 
 
 (defn sink

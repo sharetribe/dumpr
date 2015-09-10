@@ -16,7 +16,12 @@
   :global-vars {*warn-on-reflection* true}
   :min-lein-version "2.5.0"
 
-  :profiles {:dev {:source-paths ["config" "dev"]
+  :profiles {
+             :dev {:source-paths ["config" "dev"]
                    :dependencies [[com.stuartsierra/component "0.2.3"]
                                   [reloaded.repl "0.2.0"]
-                                  [io.aviso/config "0.1.7"]]}})
+                                  [io.aviso/config "0.1.7"]
+                                  [joplin.core "0.3.3"]
+                                  [joplin.jdbc "0.3.3"]
+                                  [org.clojure/test.check "0.8.1"]
+                                  [com.gfredericks/test.chuck "0.1.22"]]}})
