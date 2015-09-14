@@ -10,12 +10,12 @@
                :password "${DB_PASSWORD:dumpr_test}"
                :host "127.0.0.1"
                :port 3306
-               :db "dumpr_test_db_123"
+               :db "${DB:dumpr_test_db_123}"
                :server-id 123}          ; Has to be unique within replication cluster
  :id-fns      {} ; {:table_no_primary_key :username}
  :tables      [] ; [:table_no_primary_key :another_table]
  :filter-tables #{}
  :joplin {:migrators {:sql-mig "migrators/sql"}
           :databases {:sql-test {:type :sql
-                                 :url "jdbc:mysql://localhost/dumpr_test_db_123?user=${DB_USER:dumpr_test}&password=${DB_PASSWORD:dumpr_test}"}}
+                                 :url "jdbc:mysql://localhost/${DB:dumpr_test_db_123}?user=${DB_USER:dumpr_test}&password=${DB_PASSWORD:dumpr_test}"}}
           :environments {:test [{:db :sql-test :migrator :sql-mig}]}}}
