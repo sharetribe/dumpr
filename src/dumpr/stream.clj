@@ -109,6 +109,7 @@
   (let [expected-tables (set expected-tables)]
     (filter #(let [table (->table %)]
                (or
+                (nil? (seq expected-tables))
                 (nil? table)
                 (some? (expected-tables table)))))))
 
