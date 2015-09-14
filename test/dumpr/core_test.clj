@@ -58,7 +58,7 @@
             manufacturers)))
 
 (defn setup-and-clean-db [f]
-  #_(repl/reset (joplin-config) :test :sql-test)
+  (repl/reset (joplin-config) :test :sql-test)
   (f)
   (repl/rollback (joplin-config) :test :sql-test 1))
 
@@ -106,11 +106,4 @@
 
 (comment
   (test/run-tests)
-  (gen/sample gen-manufacturer 100)
-  (insert-manufacturers! (take 10 (gen/sample-seq gen-manufacturer)))
-
-  (->table-rows (load-tables-to-coll [:manufacturers]))
-  (-> (load-tables-to-coll [:manufacturers])
-      ->table-to-rows
-      :manufacturers)
   )
