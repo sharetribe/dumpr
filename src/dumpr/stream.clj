@@ -107,8 +107,8 @@
   table (i.e. alter table event)"
   [expected-tables]
   (filter #(let [table (->table %)]
-             (and
-              (some? table)
+             (or
+              (nil? table)
               (some? ((set expected-tables) table))))))
 
 (defn- clear-schema-cache! [schema-cache]
