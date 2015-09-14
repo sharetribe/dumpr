@@ -16,7 +16,7 @@
                  :server-id s/Int}
    :id-fns {s/Keyword (s/pred ifn?)}
    :tables [s/Keyword]
-   :filter-tables [s/Keyword]})
+   :filter-tables #{s/Keyword}})
 
 (defn config []
   (config/assemble-configuration {:prefix "dumpr"

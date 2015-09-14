@@ -92,7 +92,8 @@
     (:db event-body)))
 
 (defn- ->table [event-pair]
-  (let [[[event-type event-body]] event-pair]
+  (let [[table-map _] event-pair
+        event-body (events/event-data table-map)]
     (keyword (:table event-body))))
 
 (defn filter-database
@@ -106,12 +107,12 @@
   given tables. Does not filter events to do not contain
   table (i.e. alter table event)"
   [expected-tables]
-  (let [expected-tables (set expected-tables)]
+  (if (seq expected-tables)
     (filter #(let [table (->table %)]
                (or
-                (nil? (seq expected-tables))
                 (nil? table)
-                (some? (expected-tables table)))))))
+                (some? (expected-tables table)))))
+    (map identity)))
 
 (defn- clear-schema-cache! [schema-cache]
   (reset! schema-cache {}))
