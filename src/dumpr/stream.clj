@@ -106,10 +106,11 @@
   given tables. Does not filter events to do not contain
   table (i.e. alter table event)"
   [expected-tables]
-  (filter #(let [table (->table %)]
-             (or
-              (nil? table)
-              (some? ((set expected-tables) table))))))
+  (let [expected-tables (set expected-tables)]
+    (filter #(let [table (->table %)]
+               (or
+                (nil? table)
+                (some? (expected-tables table)))))))
 
 (defn- clear-schema-cache! [schema-cache]
   (reset! schema-cache {}))
