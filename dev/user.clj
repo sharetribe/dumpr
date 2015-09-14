@@ -1,18 +1,23 @@
 (ns user
   (:require [reloaded.repl :refer [system init start stop go]]
-            [system :as system]
+            [system :as system :refer [LibConf]]
             [dumpr.core :as dumpr]
             [clojure.core.async :as async :refer [<!]]
-            [taoensso.timbre :as log]))
+            [taoensso.timbre :as log]
+            [io.aviso.config :as config]))
 
 (Thread/setDefaultUncaughtExceptionHandler
  (reify Thread$UncaughtExceptionHandler
    (uncaughtException [_ thread ex]
      (log/error ex "Uncaught exception on" (.getName thread)))))
 
+(defn config []
+  (config/assemble-configuration {:prefix "dumpr"
+                                  :profiles [:lib :dev]
+                                  :schemas [LibConf]}))
 
-(reloaded.repl/set-init! #(system/only-stream {:file nil :position 0}))
-;; (reloaded.repl/set-init! #(system/with-initial-load))
+(reloaded.repl/set-init! #(system/only-stream (config) {:file nil :position 0}))
+;; (reloaded.repl/set-init! #(system/with-initial-load (config)))
 
 (defn reset []
   (reloaded.repl/reset))

@@ -18,10 +18,6 @@
    :tables [s/Keyword]
    :filter-tables #{s/Keyword}})
 
-(defn config []
-  (config/assemble-configuration {:prefix "dumpr"
-                                  :profiles [:lib]
-                                  :schemas [LibConf]}))
 
 (defn sink
   "Returns an atom containing a vector. Consumes values from channel
@@ -82,8 +78,8 @@
 (defn create-stream-new [conf filter-tables]
   (map->Stream {:conf conf :filter-tables filter-tables}))
 
-(defn with-initial-load []
-  (let [{:keys [conn-params id-fns tables filter-tables]} (config)
+(defn with-initial-load [config]
+  (let [{:keys [conn-params id-fns tables filter-tables]} config
         conf (dumpr/create-conf conn-params id-fns tables)]
     (component/system-map
      :conf conf
@@ -92,8 +88,8 @@
                 (create-stream-new conf filter-tables)
                 {:loader :loader}))))
 
-(defn only-stream [binlog-pos]
-  (let [{:keys [conn-params id-fns tables filter-tables]} (config)
+(defn only-stream [config binlog-pos]
+  (let [{:keys [conn-params id-fns tables filter-tables]} config
         conf (dumpr/create-conf conn-params id-fns)]
     (component/system-map
      :conf conf

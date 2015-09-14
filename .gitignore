@@ -9,4 +9,5 @@ pom.xml.asc
 /.nrepl-port
 .hgignore
 .hg/
-/config/dumpr-local-configuration.edn
+/config/dumpr-dev-configuration.edn
+/config/dumpr-test-configuration.edn
