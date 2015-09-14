@@ -63,7 +63,7 @@
       (let [binlog-pos (or (:binlog-pos this)
                            (-> loader :result :binlog-pos))
             stream (dumpr/binlog-stream conf binlog-pos)
-            out-events (sink (:out stream))]
+            out-events (sink (:out stream) println)]
         (dumpr/start-binlog-stream stream)
         (-> this
             (assoc :binlog-pos binlog-pos)
