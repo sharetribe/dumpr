@@ -3,6 +3,7 @@
   (:require [clojure.java.jdbc :as jdbc]
             [clojure.core.async :as async :refer [>!!]]
             [taoensso.timbre :as log]
+            [dumpr.utils :as utils]
             [dumpr.row-format :as row-format]))
 
 
@@ -18,7 +19,10 @@
 (defn binlog-position
   "Query binary log position from MySQL."
   [db-spec]
-  (first (jdbc/query db-spec ["SHOW MASTER STATUS"])))
+  (utils/infinite-retry
+   #(first (jdbc/query db-spec ["SHOW MASTER STATUS"]))
+   #(log/warn (str "Failed to load binlog position: " (.getMessage %1) ". Trying again in " %2 " ms"))
+   10000))
 
 (defn stream-table
   "Stream the contents of a given database table to a core.async
@@ -29,26 +33,33 @@
   [db-spec {:keys [table id-fn]} ch]
   (async/thread
     (log/info "Starting data load from table" table "id-fn:" id-fn)
-    (let [count (jdbc/query
-                 db-spec
-                 [(str "SELECT * FROM " (name table))]
-                 :row-fn (fn [v]
-                           ;; Block until output written to make sure
-                           ;; we don't close DB connection too early.
-                           (>!! ch (row-format/upsert table (id-fn v) v nil))
-                           1)
-                 :result-set-fn (partial reduce + 0))]
-      (log/info "Loaded" count "rows from table" table))
+    (utils/infinite-retry
+     #(let [count (jdbc/query
+                  db-spec
+                  [(str "SELECT * FROM " (name table))]
+                  :row-fn (fn [v]
+                            ;; Block until output written to make sure
+                            ;; we don't close DB connection too early.
+                            (>!! ch (row-format/upsert table (id-fn v) v nil))
+                            1)
+                  :result-set-fn (partial reduce + 0))]
+        (log/info "Loaded" count "rows from table" table)
+        )
+     #(log/warn (str "Table load failed: " (.getMessage %1) ". Trying again in " %2 " ms"))
+     10000)
     (async/close! ch)))
 
 (defn fetch-table-cols
   "Query table column metadata for db and table."
   [db-spec db table]
-  (jdbc/query
-   db-spec
-   ["SELECT COLUMN_NAME, DATA_TYPE, COLUMN_KEY, CHARACTER_SET_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? and TABLE_NAME = ? ORDER BY ORDINAL_POSITION"
-    db
-    table]))
+  (utils/infinite-retry
+   #(jdbc/query
+    db-spec
+    ["SELECT COLUMN_NAME, DATA_TYPE, COLUMN_KEY, CHARACTER_SET_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? and TABLE_NAME = ? ORDER BY ORDINAL_POSITION"
+     db
+     table])
+   #(log/warn (str "Schema query failed: " (.getMessage %1) ". Trying again in " %2 " ms")
+   10000)))
 
 (defn parse-table-schema
   "Parse the cols column metadata into a table schema presentation."

@@ -18,8 +18,7 @@
     (onEventDeserializationFailure [this client ex]
       (log/info (str "BinaryLogClient event deserialization failure: " (.getMessage ex))))
     (onDisconnect [this client]
-      (log/info "BinaryLogClient disconnected")
-      (async/close! out))))
+      (log/info "BinaryLogClient disconnected"))))
 
 (defn event-listener [out]
   (reify
@@ -40,11 +39,12 @@
     (.setServerId server-id)
     (.setBinlogPosition position)
     (.setBinlogFilename file)
+    (.setKeepAliveInterval 10000)
     (.registerEventListener (event-listener out))
     (.registerLifecycleListener (lifecycle-listener out))))
 
 (defn start-client [^BinaryLogClient client]
-  (.connect client 1000))
+  (.connect client 3000))
 
 (defn stop-client [^BinaryLogClient client]
   (.disconnect client))

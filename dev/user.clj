@@ -36,6 +36,8 @@
   (-> system :streamer :out-events deref last)
   (-> system :streamer :out-events deref)
   (-> system :streamer :binlog-pos)
+
+  (reloaded.repl/stop)
   )
 
 
