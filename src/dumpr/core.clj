@@ -28,10 +28,11 @@
                identifier value for that table row. Normally you'll be using
                the identifier column as a keyword as the id function
                (e.g. {:mytable :identifier})"
-  [conn-params id-fns]
+  [conn-params id-fns tables]
   {:db-spec (query/db-spec conn-params)
    :conn-params conn-params
-   :id-fns id-fns})
+   :id-fns id-fns
+   :tables tables})
 
 (defn load-tables
   "Load the contents of given tables from the DB and return the
@@ -68,13 +69,16 @@
    (let [db-spec          (:db-spec conf)
          db               (get-in conf [:conn-params :db])
          id-fns           (:id-fns conf)
+         tables           (:tables conf)
          schema-cache     (atom {})
          events-xform     (comp (map events/parse-event)
                                 (remove nil?)
                                 stream/filter-txs
                                 (stream/add-binlog-filename (:filename binlog-pos))
                                 stream/group-table-maps
-                                (stream/filter-database db))
+                                (stream/filter-database db)
+                                (stream/filter-tables tables)
+                                )
          events-ch        (chan 1 events-xform)
          schema-loaded-ch (chan 1)
          client           (binlog/new-binlog-client (:conn-params conf)

@@ -83,7 +83,7 @@
 
 (defn with-initial-load []
   (let [{:keys [conn-params id-fns tables]} (config)
-        conf (dumpr/create-conf conn-params id-fns)]
+        conf (dumpr/create-conf conn-params id-fns tables)]
     (component/system-map
      :conf conf
      :loader (create-loader conf tables)
@@ -92,8 +92,8 @@
                 {:loader :loader}))))
 
 (defn only-stream [binlog-pos]
-  (let [{:keys [conn-params id-fns]} (config)
-        conf (dumpr/create-conf conn-params id-fns)]
+  (let [{:keys [conn-params id-fns tables]} (config)
+        conf (dumpr/create-conf conn-params id-fns tables)]
     (component/system-map
      :conf conf
      :streamer (create-stream-continue conf binlog-pos))))
