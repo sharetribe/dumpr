@@ -63,8 +63,9 @@
       :binlog-pos binlog-pos})))
 
 (defn binlog-stream
-  ([conf binlog-pos] (binlog-stream conf binlog-pos (chan stream-buffer-default-size)))
-  ([conf binlog-pos out]
+  ([conf binlog-pos] nil)
+  ([conf binlog-pos tables] (binlog-stream conf binlog-pos tables (chan stream-buffer-default-size)))
+  ([conf binlog-pos tables out]
    (let [db-spec          (:db-spec conf)
          db               (get-in conf [:conn-params :db])
          id-fns           (:id-fns conf)
@@ -74,7 +75,9 @@
                                 stream/filter-txs
                                 (stream/add-binlog-filename (:filename binlog-pos))
                                 stream/group-table-maps
-                                (stream/filter-database db))
+                                (stream/filter-database db)
+                                (stream/filter-tables tables)
+                                )
          events-ch        (chan 1 events-xform)
          schema-loaded-ch (chan 1)
          client           (binlog/new-binlog-client (:conn-params conf)

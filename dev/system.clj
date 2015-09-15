@@ -15,7 +15,8 @@
                  :db s/Str
                  :server-id s/Int}
    :id-fns {s/Keyword (s/pred ifn?)}
-   :tables [s/Keyword]})
+   :tables [s/Keyword]
+   :filter-tables #{s/Keyword}})
 
 (defn config []
   (config/assemble-configuration {:prefix "dumpr"
@@ -62,7 +63,7 @@
     (if-not (some? (:stream this))
       (let [binlog-pos (or (:binlog-pos this)
                            (-> loader :result :binlog-pos))
-            stream (dumpr/binlog-stream conf binlog-pos)
+            stream (dumpr/binlog-stream conf binlog-pos (:filter-tables this))
             out-events (sink (:out stream) println)]
         (dumpr/start-binlog-stream stream)
         (-> this
@@ -75,25 +76,25 @@
       (dumpr/close-binlog-stream (:stream this)))
     (dissoc this :stream)))
 
-(defn create-stream-continue [conf binlog-pos]
-  (map->Stream {:conf conf :binlog-pos binlog-pos}))
+(defn create-stream-continue [conf binlog-pos filter-tables]
+  (map->Stream {:conf conf :binlog-pos binlog-pos :filter-tables filter-tables}))
 
-(defn create-stream-new [conf]
-  (map->Stream {:conf conf}))
+(defn create-stream-new [conf filter-tables]
+  (map->Stream {:conf conf :filter-tables filter-tables}))
 
 (defn with-initial-load []
-  (let [{:keys [conn-params id-fns tables]} (config)
-        conf (dumpr/create-conf conn-params id-fns)]
+  (let [{:keys [conn-params id-fns tables filter-tables]} (config)
+        conf (dumpr/create-conf conn-params id-fns tables)]
     (component/system-map
      :conf conf
      :loader (create-loader conf tables)
      :streamer (component/using
-                (create-stream-new conf)
+                (create-stream-new conf filter-tables)
                 {:loader :loader}))))
 
 (defn only-stream [binlog-pos]
-  (let [{:keys [conn-params id-fns]} (config)
+  (let [{:keys [conn-params id-fns tables filter-tables]} (config)
         conf (dumpr/create-conf conn-params id-fns)]
     (component/system-map
      :conf conf
-     :streamer (create-stream-continue conf binlog-pos))))
+     :streamer (create-stream-continue conf binlog-pos filter-tables))))

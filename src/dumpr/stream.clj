@@ -91,11 +91,28 @@
   (let [[[event-type event-body]] event-pair]
     (:db event-body)))
 
+(defn- ->table [event-pair]
+  (let [[table-map _] event-pair
+        event-body (events/event-data table-map)]
+    (keyword (:table event-body))))
+
 (defn filter-database
   "Returns a transducer that removes events that are not from the
   given database"
   [expected-db]
   (filter #(= (->db %) expected-db)))
+
+(defn filter-tables
+  "Returns a transducer that removes events that are not from the
+  given tables. Does not filter events to do not contain
+  table (i.e. alter table event)"
+  [expected-tables]
+  (if (seq expected-tables)
+    (filter #(let [table (->table %)]
+               (or
+                (nil? table)
+                (some? (expected-tables table)))))
+    (map identity)))
 
 (defn- clear-schema-cache! [schema-cache]
   (reset! schema-cache {}))
