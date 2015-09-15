@@ -1,0 +1,12 @@
+machine:
+  timezone:
+    Europe/Helsinki
+
+dependencies:
+  pre:
+    - sudo sed -i '$ a log_bin\nserver-id=5' /etc/mysql/my.cnf
+    - sudo service mysql restart
+
+database:
+  override:
+    - mysql -u ubuntu < create_test_db.sql
