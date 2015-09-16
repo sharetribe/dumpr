@@ -8,6 +8,7 @@
  - [X] Convert text type columns to strings using proper encoding
  - [ ] What happens if the given binary log position is invalid
  - [ ] What happens if DB connection drops, can we reconnect?
+ - [ ] Create an example application that uses Dumpr library
  - [ ] stop event handling
  - [ ] testing strategy
  - [ ] channel metrics
