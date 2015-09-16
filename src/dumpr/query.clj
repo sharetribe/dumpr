@@ -3,7 +3,6 @@
   (:require [clojure.java.jdbc :as jdbc]
             [clojure.core.async :as async :refer [>!!]]
             [taoensso.timbre :as log]
-            [dumpr.utils :as utils]
             [dumpr.row-format :as row-format]))
 
 
