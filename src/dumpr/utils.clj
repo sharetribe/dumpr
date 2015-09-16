@@ -1,10 +1,11 @@
 (ns dumpr.utils)
 
-(defn infinite-retry
-  ([f] (infinite-retry f identity))
-  ([f handler] (infinite-retry f handler (constantly true)))
-  ([f handler should-retry?] (infinite-retry f handler should-retry? (* 120 1000)))
-  ([f handler should-retry? max-wait] (infinite-retry f handler should-retry? max-wait 1000))
+(defn retry
+  "Run the given function. If it throws, retry. Provide optional parameters to control the retry logic"
+  ([f] (retry f identity))
+  ([f handler] (retry f handler (constantly true)))
+  ([f handler should-retry?] (retry f handler should-retry? (* 120 1000)))
+  ([f handler should-retry? max-wait] (retry f handler should-retry? max-wait 1000))
   ([f handler should-retry? max-wait start-wait]
    (loop [wait start-wait]
      (let [wait (min wait max-wait)

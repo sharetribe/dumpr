@@ -152,7 +152,7 @@
       (let [table-spec (table-schema/->table-spec (keyword table) id-fns)
             schema     (<!
                         (thread
-                          (utils/infinite-retry
+                          (utils/retry
                            #(table-schema/load-schema db-spec db table-spec)
                            #(log/warn (str "Table load failed. Trying again in " %2 " ms") %1)
                            #(not (deref stopped))
