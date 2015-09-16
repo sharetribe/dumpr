@@ -1,9 +1,11 @@
 (ns dumpr.stream
   "Transformations for the stream of parsed binlog events."
-  (:require [clojure.core.async :as async :refer [go-loop <! >!]]
+  (:require [clojure.core.async :as async :refer [go go-loop <! >! thread]]
             [schema.core :as s]
             [dumpr.table-schema :as table-schema]
+            [taoensso.timbre :as log]
             [dumpr.query :as query]
+            [dumpr.utils :as utils]
             [dumpr.row-format :as row-format]
             [dumpr.events :as events]))
 
@@ -143,26 +145,33 @@
   (nil? (validation-error schema)))
 
 (defn- fetch-table-schema [table db db-spec id-fns schema-cache]
-  (if-let [schema (get-from-cache schema-cache table)]
-    schema
-    (let [table-spec (table-schema/->table-spec (keyword table) id-fns)
-          schema     (table-schema/load-schema db-spec db table-spec)]
-      (add-to-cache! schema-cache table schema)
-      schema)))
+  (go
+    (if-let [schema (get-from-cache schema-cache table)]
+      schema
+      (let [table-spec (table-schema/->table-spec (keyword table) id-fns)
+            schema     (<!
+                        (thread
+                          (utils/infinite-retry
+                           #(table-schema/load-schema db-spec db table-spec)
+                           #(log/warn (str "Table load failed. Trying again in " %2 " ms") %1)
+                           10000)))]
+        (add-to-cache! schema-cache table schema)
+        schema))))
 
 (defn with-table-schema
   [event-pair db-spec id-fns schema-cache]
-  (let [[table-map mutation] event-pair]
-    (if (= (events/event-type table-map) :table-map)
-      (let [{:keys [db table]} (events/event-data table-map)
-            schema             (fetch-table-schema table db db-spec id-fns schema-cache)]
-        (if (valid-schema? schema)
-          [(assoc-in table-map [1 :schema] schema) mutation]
-          [(row-format/error "Invalid schema"
-                             {:schema schema :db db :table table}
-                             {:table-meta (events/event-meta table-map)
-                              :error (validation-error schema)})]))
-      table-map)))
+  (go
+    (let [[table-map mutation] event-pair]
+      (if (= (events/event-type table-map) :table-map)
+        (let [{:keys [db table]} (events/event-data table-map)
+              schema             (<! (fetch-table-schema table db db-spec id-fns schema-cache))]
+          (if (valid-schema? schema)
+            [(assoc-in table-map [1 :schema] schema) mutation]
+            [(row-format/error "Invalid schema"
+                               {:schema schema :db db :table table}
+                               {:table-meta (events/event-meta table-map)
+                                :error (validation-error schema)})]))
+        table-map))))
 
 (defn add-table-schema
   "Processes event-pairs from in channel and adds a schema to the
@@ -177,7 +186,7 @@
         (if (= (events/event-type table-map) :alter-table)
           (do (clear-schema-cache! schema-cache)
               (recur))
-          (do (>! out (with-table-schema event-pair db-spec id-fns schema-cache))
+          (do (>! out (<! (with-table-schema event-pair db-spec id-fns schema-cache)))
               (recur))))
       (async/close! out))))
 

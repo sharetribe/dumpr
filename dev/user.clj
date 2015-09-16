@@ -2,7 +2,7 @@
   (:require [reloaded.repl :refer [system init start stop go]]
             [system :as system :refer [LibConf]]
             [dumpr.core :as dumpr]
-            [clojure.core.async :as async :refer [<!]]
+            [clojure.core.async :as async :refer [<! go-loop >! timeout]]
             [taoensso.timbre :as log]
             [io.aviso.config :as config]))
 
@@ -22,6 +22,17 @@
 (defn reset []
   (reloaded.repl/reset))
 
+(defn delay-chan
+  "Takes in and out channels and adds delay"
+  [in out delay]
+  (go-loop []
+    (if-some [event (<! in)]
+      (do
+        (println (str "Got event, now timeout for " delay " millis"))
+        (<! (timeout delay))
+        (>! out event)
+        (recur))
+      (async/close!))))
 
 (comment
   (reset)
