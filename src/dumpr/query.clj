@@ -21,7 +21,7 @@
   [db-spec]
   (utils/infinite-retry
    #(first (jdbc/query db-spec ["SHOW MASTER STATUS"]))
-   #(log/warn (str "Failed to load binlog position: " (.getMessage %1) ". Trying again in " %2 " ms"))
+   #(log/warn (str "Failed to load binlog position. Trying again in " %2 " ms") %1)
    10000))
 
 (defn stream-table
@@ -45,7 +45,7 @@
                   :result-set-fn (partial reduce + 0))]
         (log/info "Loaded" count "rows from table" table)
         )
-     #(log/warn (str "Table load failed: " (.getMessage %1) ". Trying again in " %2 " ms"))
+     #(log/warn (str "Table load failed. Trying again in " %2 " ms") %1)
      10000)
     (async/close! ch)))
 
