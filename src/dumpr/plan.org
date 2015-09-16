@@ -10,7 +10,7 @@
  - [ ] What happens if DB connection drops, can we reconnect?
  - [ ] Create an example application that uses Dumpr library
  - [ ] stop event handling
- - [ ] testing strategy
+ - [X] testing strategy
  - [ ] channel metrics
  - [ ] Test nexted tx?
  - [ ] write good README
