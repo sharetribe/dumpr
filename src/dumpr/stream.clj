@@ -144,7 +144,8 @@
 (defn- valid-schema? [schema]
   (nil? (validation-error schema)))
 
-(defn- fetch-table-schema [table db {:keys [db-spec id-fns schema-cache keepalive-interval]}]
+(defn- fetch-table-schema
+  [table db {:keys [db-spec id-fns schema-cache keepalive-interval stopped]}]
   (go
     (if-let [schema (get-from-cache schema-cache table)]
       schema
@@ -154,6 +155,7 @@
                           (utils/infinite-retry
                            #(table-schema/load-schema db-spec db table-spec)
                            #(log/warn (str "Table load failed. Trying again in " %2 " ms") %1)
+                           #(not (deref stopped))
                            keepalive-interval)))]
         (add-to-cache! schema-cache table schema)
         schema))))
@@ -165,12 +167,23 @@
       (if (= (events/event-type table-map) :table-map)
         (let [{:keys [db table]} (events/event-data table-map)
               schema             (<! (fetch-table-schema table db opts))]
-          (if (valid-schema? schema)
-            [(assoc-in table-map [1 :schema] schema) mutation]
-            [(row-format/error "Invalid schema"
-                               {:schema schema :db db :table table}
-                               {:table-meta (events/event-meta table-map)
-                                :error (validation-error schema)})]))
+          (cond
+            (nil? schema)                [(row-format/error
+                                           (str "Couldn't load theschema. "
+                                                "Maybe the binlog client was stopped?")
+                                           {:schema schema :db
+                                           db :table table}
+                                           {:table-meta (events/event-meta
+                                           table-map)
+                                            :error nil})]
+            (not (valid-schema? schema)) [(row-format/error
+                                           "Invalid schema"
+                                           {:schema schema :db db :table table}
+                                           {:table-meta (events/event-meta table-map)
+                                            :error (validation-error schema)})]
+            :else                        [(assoc-in table-map [1 :schema] schema) mutation]
+
+            ))
         table-map))))
 
 (defn add-table-schema

@@ -2,9 +2,10 @@
 
 (defn infinite-retry
   ([f] (infinite-retry f identity))
-  ([f handler] (infinite-retry f handler (* 120 1000)))
-  ([f handler max-wait] (infinite-retry f handler max-wait 1000))
-  ([f handler max-wait start-wait]
+  ([f handler] (infinite-retry f handler (constantly true)))
+  ([f handler should-retry?] (infinite-retry f handler should-retry? (* 120 1000)))
+  ([f handler should-retry? max-wait] (infinite-retry f handler should-retry? max-wait 1000))
+  ([f handler should-retry? max-wait start-wait]
    (loop [wait start-wait]
      (let [wait (min wait max-wait)
            [success result] (try
@@ -15,4 +16,6 @@
                                 [false]))]
        (if success
          result
-         (recur (* wait 2)))))))
+         (do
+           (when (should-retry?)
+             (recur (* wait 2)))))))))

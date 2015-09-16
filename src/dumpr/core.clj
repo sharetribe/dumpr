@@ -80,6 +80,7 @@
                                   (stream/filter-tables (set tables)))
          events-ch          (chan 1 events-xform)
          schema-loaded-ch   (chan 1)
+         stopped            (atom false)
          client             (binlog/new-binlog-client (:conn-params conf)
                                                       binlog-pos
                                                       events-ch)]
@@ -90,6 +91,7 @@
                                :db-spec db-spec
                                :id-fns id-fns
                                :keepalive-interval keepalive-interval
+                               :stopped stopped
                                })
      (async/pipeline 4
                      out
@@ -97,11 +99,13 @@
                            cat)
                      schema-loaded-ch)
      {:client client
-      :out out})))
+      :out out
+      :stopped stopped})))
 
 
 (defn start-binlog-stream [stream]
   (binlog/start-client (:client stream)))
 
 (defn close-binlog-stream [stream]
+  (reset! (:stopped stream) true)
   (binlog/stop-client (:client stream)))
