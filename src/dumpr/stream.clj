@@ -144,7 +144,7 @@
 (defn- valid-schema? [schema]
   (nil? (validation-error schema)))
 
-(defn- fetch-table-schema [table db db-spec id-fns schema-cache]
+(defn- fetch-table-schema [table db {:keys [db-spec id-fns schema-cache keepalive-interval]}]
   (go
     (if-let [schema (get-from-cache schema-cache table)]
       schema
@@ -154,17 +154,17 @@
                           (utils/infinite-retry
                            #(table-schema/load-schema db-spec db table-spec)
                            #(log/warn (str "Table load failed. Trying again in " %2 " ms") %1)
-                           10000)))]
+                           keepalive-interval)))]
         (add-to-cache! schema-cache table schema)
         schema))))
 
 (defn with-table-schema
-  [event-pair db-spec id-fns schema-cache]
+  [event-pair opts]
   (go
     (let [[table-map mutation] event-pair]
       (if (= (events/event-type table-map) :table-map)
         (let [{:keys [db table]} (events/event-data table-map)
-              schema             (<! (fetch-table-schema table db db-spec id-fns schema-cache))]
+              schema             (<! (fetch-table-schema table db opts))]
           (if (valid-schema? schema)
             [(assoc-in table-map [1 :schema] schema) mutation]
             [(row-format/error "Invalid schema"
@@ -179,14 +179,14 @@
   resulting enriched event-pairs to out channel. If the event-pair
   contains a :alter-table event then that event is filtered and schema
   cache is cleared."
-  [out in {:keys [db-spec id-fns schema-cache]}]
+  [out in {:keys [schema-cache] :as opts}]
   (go-loop []
     (if-some [event-pair (<! in)]
       (let [[table-map _] event-pair]
         (if (= (events/event-type table-map) :alter-table)
           (do (clear-schema-cache! schema-cache)
               (recur))
-          (do (>! out (<! (with-table-schema event-pair db-spec id-fns schema-cache)))
+          (do (>! out (<! (with-table-schema event-pair opts)))
               (recur))))
       (async/close! out))))
 

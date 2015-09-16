@@ -32,14 +32,17 @@
   client will start reading binary log at given file and
   position. Events are written to out channel. Out is closed on client
   disconnect."
-  [{:keys [host port user password server-id]}
+  [{:keys [
+           host port user password server-id
+           stream-keepalive-interval stream-keepalive-timeout]}
    {:keys [file position]}
    out]
   (doto (BinaryLogClient. host port user password)
     (.setServerId server-id)
     (.setBinlogPosition position)
     (.setBinlogFilename file)
-    (.setKeepAliveInterval 10000)
+    (.setKeepAliveInterval stream-keepalive-interval)
+    (.setKeepAliveConnectTimeout stream-keepalive-timeout)
     (.registerEventListener (event-listener out))
     (.registerLifecycleListener (lifecycle-listener out))))
 

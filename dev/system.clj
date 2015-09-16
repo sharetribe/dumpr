@@ -13,7 +13,10 @@
                    :host s/Str
                    :port s/Int
                    :db s/Str
-                   :server-id s/Int}
+                   :server-id s/Int
+                   :stream-keepalive-timeout s/Int
+                   :stream-keepalive-interval s/Int
+                   :query-max-keepalive-interval s/Int}
    :id-fns        {s/Keyword (s/pred ifn?)}
    :tables        [s/Keyword]
    :filter-tables #{s/Keyword}
