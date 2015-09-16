@@ -69,7 +69,7 @@
    (let [db-spec            (:db-spec conf)
          db                 (get-in conf [:conn-params :db])
          id-fns             (:id-fns conf)
-         keepalive-interval (:query-keepalive-max-interval conf)
+         keepalive-interval (get-in conf [:conn-params :query-max-keepalive-interval])
          schema-cache       (atom {})
          events-xform       (comp (map events/parse-event)
                                   (remove nil?)
