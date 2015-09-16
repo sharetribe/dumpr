@@ -19,10 +19,7 @@
 (defn binlog-position
   "Query binary log position from MySQL."
   [db-spec]
-  (utils/infinite-retry
-   #(first (jdbc/query db-spec ["SHOW MASTER STATUS"]))
-   #(log/warn (str "Failed to load binlog position. Trying again in " %2 " ms") %1)
-   10000))
+  (first (jdbc/query db-spec ["SHOW MASTER STATUS"])))
 
 (defn stream-table
   "Stream the contents of a given database table to a core.async
@@ -33,20 +30,16 @@
   [db-spec {:keys [table id-fn]} ch]
   (async/thread
     (log/info "Starting data load from table" table "id-fn:" id-fn)
-    (utils/infinite-retry
-     #(let [count (jdbc/query
-                  db-spec
-                  [(str "SELECT * FROM " (name table))]
-                  :row-fn (fn [v]
-                            ;; Block until output written to make sure
-                            ;; we don't close DB connection too early.
-                            (>!! ch (row-format/upsert table (id-fn v) v nil))
-                            1)
-                  :result-set-fn (partial reduce + 0))]
-        (log/info "Loaded" count "rows from table" table)
-        )
-     #(log/warn (str "Table load failed. Trying again in " %2 " ms") %1)
-     10000)
+    (let [count (jdbc/query
+                 db-spec
+                 [(str "SELECT * FROM " (name table))]
+                 :row-fn (fn [v]
+                           ;; Block until output written to make sure
+                           ;; we don't close DB connection too early.
+                           (>!! ch (row-format/upsert table (id-fn v) v nil))
+                           1)
+                 :result-set-fn (partial reduce + 0))]
+      (log/info "Loaded" count "rows from table" table))
     (async/close! ch)))
 
 (defn fetch-table-cols
