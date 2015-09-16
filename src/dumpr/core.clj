@@ -62,19 +62,6 @@
      {:out out
       :binlog-pos binlog-pos})))
 
-
-(defn delay-chan
-  "Takes in and out channels and adds delay"
-  [in out delay]
-  (go-loop []
-    (if-some [event (<! in)]
-      (do
-        (println (str "Got event, now timeout for " delay " millis"))
-        (<! (timeout delay))
-        (>! out event)
-        (recur))
-      (async/close!))))
-
 (defn binlog-stream
   ([conf binlog-pos] (binlog-stream conf binlog-pos nil (chan stream-buffer-default-size)))
   ([conf binlog-pos tables] (binlog-stream conf binlog-pos tables (chan stream-buffer-default-size)))
