@@ -46,10 +46,10 @@
   "Query table column metadata for db and table."
   [db-spec db table]
   (jdbc/query
-    db-spec
-    ["SELECT COLUMN_NAME, DATA_TYPE, COLUMN_KEY, CHARACTER_SET_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? and TABLE_NAME = ? ORDER BY ORDINAL_POSITION"
-     db
-     table]))
+   db-spec
+   ["SELECT COLUMN_NAME, DATA_TYPE, COLUMN_KEY, CHARACTER_SET_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? and TABLE_NAME = ? ORDER BY ORDINAL_POSITION"
+    db
+    table]))
 
 (defn parse-table-schema
   "Parse the cols column metadata into a table schema presentation."
