@@ -4,6 +4,7 @@
             [clojure.core.async :refer [<!!]]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]
             [com.gfredericks.test.chuck :as chuck]
+            [com.gfredericks.test.chuck.generators :as gen']
             [dumpr.test-util :as test-util]
             [dumpr.core :as dumpr])
   (:import [java.util Date Calendar]))
@@ -116,14 +117,34 @@
                       #(apply gen-random-ops %))))
 
 
+(defn partition-2
+  "Partition the collection returned by coll-gen randomly into two."
+  [coll-gen]
+  (gen'/for [coll coll-gen
+             ppoint (gen/choose 0 (Math/max 0 (dec (count coll))))]
+    (split-at ppoint coll)))
+
+
 ;; Helpers
 
 (defn- load-tables-to-coll [tables]
   (let [{:keys [conn-params]} (test-util/config)
         conf (dumpr/create-conf conn-params {})
         res (dumpr/load-tables tables conf)]
-   (<!! (test-util/sink-to-coll (:out res)))))
+    {:out (<!! (test-util/sink-to-coll (:out res)))
+     :binlog-pos (:binlog-pos res)}))
 
+(defn- create-and-start-stream [binlog-pos]
+  (let [{:keys [conn-params]} (test-util/config)
+        conf (dumpr/create-conf conn-params {})
+        stream (dumpr/binlog-stream conf binlog-pos [:widgets :manufacturers])]
+    (dumpr/start-binlog-stream stream)
+    stream))
+
+(defn- stream-to-coll-and-close [stream n]
+  (let [out (<!! (test-util/sink-to-coll (:out stream) n))]
+    (dumpr/close-binlog-stream stream)
+    out))
 
 
 ;; Tests
@@ -134,12 +155,26 @@
     (test-util/reset-test-db!)
     (test-util/into-test-db! ops)
     (let [expected (test-util/into-entity-map ops)
-          actual (-> (load-tables-to-coll [:widgets :manufacturers])
+          actual (-> (load-tables-to-coll #{:widgets :manufacturers})
+                     :out
                      test-util/into-entity-map)]
       (is (= expected actual)))))
 
+(deftest streaming
+  (checking "Streaming" (chuck/times 10)
+    [[initial streamed] (partition-2 gen-ops-sequence)]
+    (test-util/reset-test-db!)
+    (test-util/into-test-db! initial)
+    (let [{:keys [out binlog-pos]} (load-tables-to-coll [:widgets :manufacturers])
+          stream                   (create-and-start-stream binlog-pos)
+          _                        (test-util/into-test-db! streamed)
+          stream-out               (stream-to-coll-and-close stream (count streamed))]
+      (is (= (test-util/into-entity-map (concat initial streamed))
+             (test-util/into-entity-map (concat out stream-out)))))))
+
 
 (comment
+  (test/run-tests)
   (let [ops (last (gen/sample gen-ops-sequence 25))]
     (test-util/into-entity-map ops))
 
@@ -147,4 +182,6 @@
     (test-util/reset-test-db!)
     (test-util/into-test-db! ops)
     (test-util/into-entity-map ops))
+
+  (last (gen/sample (partition-2 gen-ops-sequence) 5))
   )

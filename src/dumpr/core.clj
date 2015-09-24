@@ -76,7 +76,7 @@
                                 (stream/add-binlog-filename (:filename binlog-pos))
                                 stream/group-table-maps
                                 (stream/filter-database db)
-                                (stream/filter-tables tables)
+                                #_(stream/filter-tables tables)
                                 )
          events-ch        (chan 1 events-xform)
          schema-loaded-ch (chan 1)

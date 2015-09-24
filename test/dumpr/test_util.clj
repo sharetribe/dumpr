@@ -20,18 +20,28 @@
 (defn reset-test-db!
   "Clear the contents of the test db and reset schema."
   []
-  (repl/reset (joplin-config) :test :sql-test))
+  (with-out-str (repl/reset (joplin-config) :test :sql-test)))
 
 (defn sink-to-coll
   "Sink a channel into a collection. Return a channel that will get a
   single value, the resulting collection, upon in channel being
   closed."
-  [in]
-  (go-loop [res (transient [])]
-    (let [val (<! in)]
-      (if-not (nil? val)
-        (recur (conj! res val))
-        (persistent! res)))))
+  ([in]
+   (go-loop [res (transient [])]
+     (let [val (<! in)]
+       (if-not (nil? val)
+         (recur (conj! res val))
+         (persistent! res)))))
+  ([in n]
+   (go-loop [res (transient [])
+             cnt n]
+     (if (<= cnt 0)
+       (persistent! res)
+       (let [val (<! in)]
+         (if (nil? val)
+           (persistent! res)
+           (recur (conj! res val)
+                  (dec cnt))))))))
 
 (defn into-test-db!
   "Interpret the given ordered ops sequence as SQL inserts, updates
@@ -53,8 +63,8 @@
 
 (defn into-entity-map
   "Interpret the given ordered ops sequence by building a map of the
-  final values for entities, identified by table and id. Insert and
-  updates add entities into map and deletes remove them."
+  final values for entities, identified by table and id. Inserts,
+  updates and upserts add entities into map and deletes remove them."
   [ops]
   (reduce (fn [entities [type table id content _ :as op]]
             (let [key (table-id-key op)]
