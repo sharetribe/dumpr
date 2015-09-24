@@ -17,7 +17,7 @@
   {:connection-uri (-> (joplin-config) :databases :sql-test :url)})
 
 
-(defn reset-test-db
+(defn reset-test-db!
   "Clear the contents of the test db and reset schema."
   []
   (repl/reset (joplin-config) :test :sql-test))
@@ -33,27 +33,36 @@
         (recur (conj! res val))
         (persistent! res)))))
 
-(defn insert-rows!
-  "Insert a seq of [table-name row-content] tuples into test
-  database."
-  [rows]
+(defn into-test-db!
+  "Interpret the given ordered ops sequence as SQL inserts, updates
+  and deletes and run them against the test DB."
+  [ops]
   (jdbc/with-db-connection [conn (db-spec)]
     (reduce
-     (fn [upserts [table content]]
-       (let [res (jdbc/insert! conn table content)
-             content-with-id (assoc content
-                                    :id
-                                    (-> res
-                                        first
-                                        :generated_key))]
-         (conj upserts [:upsert table (:id content-with-id) content-with-id nil])))
+     (fn [res [type table id content _]]
+       (conj res
+             (condp = type
+               :insert (jdbc/insert! conn table content)
+               :update (jdbc/update! conn table content ["id = ?" id])
+               :delete (jdbc/delete! conn table ["id = ?" id]))))
      []
-     rows)))
+     ops)))
 
-(defn ->table-to-rows
-  "Convert a seq of upserts into a map of table name to rows"
-  [upserts]
-  (into {}
-        (->> (group-by second upserts)
-             (map (fn [[table rows]]
-                    [table (map #(nth % 3) rows)])))))
+(defn table-id-key [[_ table id _ _]]
+  (str table "-" id))
+
+(defn into-entity-map
+  "Interpret the given ordered ops sequence by building a map of the
+  final values for entities, identified by table and id. Insert and
+  updates add entities into map and deletes remove them."
+  [ops]
+  (reduce (fn [entities [type table id content _ :as op]]
+            (let [key (table-id-key op)]
+              (condp = type
+                :insert (assoc entities key content)
+                :update (assoc entities key content)
+                :upsert (assoc entities key content)
+                :delete (dissoc entities key))))
+          {}
+          ops))
+
