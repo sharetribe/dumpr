@@ -99,14 +99,14 @@
                                         :entities entities}
                                        {:result (conj result
                                                       (assoc op 0 :insert))
-                                        :entities (assoc entities key true)})
+                                        :entities (conj entities key)})
                     (= type :delete) (if (entities key)
                                        {:result (conj result op)
-                                        :entities (dissoc entities key)}
+                                        :entities (disj entities key)}
                                        {:result result
                                         :entities entities}))))
               {:result []
-               :entities {}}
+               :entities #{}}
               ops)
       :result))
 
