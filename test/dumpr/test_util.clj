@@ -59,7 +59,7 @@
      ops)))
 
 (defn table-id-key [[_ table id _ _]]
-  (str table "-" id))
+  (str table "/" id))
 
 (defn into-entity-map
   "Interpret the given ordered ops sequence by building a map of the

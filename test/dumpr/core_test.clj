@@ -134,10 +134,12 @@
     {:out (<!! (test-util/sink-to-coll (:out res)))
      :binlog-pos (:binlog-pos res)}))
 
-(defn- create-and-start-stream [binlog-pos]
+(defn- create-and-start-stream [binlog-pos tables]
   (let [{:keys [conn-params]} (test-util/config)
         conf (dumpr/create-conf conn-params {})
-        stream (dumpr/binlog-stream conf binlog-pos [:widgets :manufacturers])]
+        stream (if (seq tables)
+                 (dumpr/binlog-stream conf binlog-pos #{:widgets :manufacturers})
+                 (dumpr/binlog-stream conf binlog-pos))]
     (dumpr/start-binlog-stream stream)
     stream))
 
@@ -150,23 +152,26 @@
 ;; Tests
 
 (deftest table-loading
-  (checking "All inserted content is loaded" (chuck/times 10)
+  (checking "All content inserted before table load is returned in it" (chuck/times 10)
     [ops gen-ops-sequence]
+
     (test-util/reset-test-db!)
     (test-util/into-test-db! ops)
     (let [expected (test-util/into-entity-map ops)
-          actual (-> (load-tables-to-coll #{:widgets :manufacturers})
+          actual (-> (load-tables-to-coll [:widgets :manufacturers])
                      :out
                      test-util/into-entity-map)]
       (is (= expected actual)))))
 
 (deftest streaming
-  (checking "Streaming" (chuck/times 10)
-    [[initial streamed] (partition-2 gen-ops-sequence)]
+  (checking "All content inserted after table load is returned in stream" (chuck/times 15)
+    [tables             (gen/elements [#{:widgets :manufacturers} nil])
+     [initial streamed] (partition-2 gen-ops-sequence)]
+
     (test-util/reset-test-db!)
     (test-util/into-test-db! initial)
     (let [{:keys [out binlog-pos]} (load-tables-to-coll [:widgets :manufacturers])
-          stream                   (create-and-start-stream binlog-pos)
+          stream                   (create-and-start-stream binlog-pos tables)
           _                        (test-util/into-test-db! streamed)
           stream-out               (stream-to-coll-and-close stream (count streamed))]
       (is (= (test-util/into-entity-map (concat initial streamed))
