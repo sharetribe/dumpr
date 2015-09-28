@@ -165,7 +165,7 @@
 
 (deftest streaming
   (checking "All content inserted after table load is returned in stream" (chuck/times 15)
-    [tables             (gen/elements [#{:widgets :manufacturers} nil])
+    [tables             (gen/elements [#{:widgets :manufacturers} nil #{}])
      [initial streamed] (partition-2 gen-ops-sequence)]
 
     (test-util/reset-test-db!)
