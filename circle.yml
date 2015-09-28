@@ -13,4 +13,4 @@ database:
 
 test:
   override:
-    - TEST_CHECK_FACTOR=20 lein test
+    - TEST_CHECK_FACTOR=15 lein test
