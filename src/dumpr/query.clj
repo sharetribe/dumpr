@@ -20,6 +20,11 @@
   [db-spec]
   (first (jdbc/query db-spec ["SHOW MASTER STATUS"])))
 
+(defn show-binlog-positions
+  "List all available binary log positions."
+  [db-spec]
+  (jdbc/query db-spec ["SHOW BINARY LOGS"]))
+
 (defn stream-table
   "Stream the contents of a given database table to a core.async
   channel. Designed to work as async-fn of

@@ -14,9 +14,9 @@
     (onConnect [this client]
       (log/info "BinaryLogClient connected"))
     (onCommunicationFailure [this client ex]
-      (log/info (str "BinaryLogClient communication failure: " (.getMessage ex))))
+      (log/warn "BinaryLogClient communication failure: " ex))
     (onEventDeserializationFailure [this client ex]
-      (log/info (str "BinaryLogClient event deserialization failure: " (.getMessage ex))))
+      (log/warn "BinaryLogClient event deserialization failure: " ex))
     (onDisconnect [this client]
       (log/info "BinaryLogClient disconnected"))))
 

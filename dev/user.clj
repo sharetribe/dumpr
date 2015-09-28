@@ -16,8 +16,8 @@
                                   :profiles [:lib :dev]
                                   :schemas [LibConf]}))
 
-(reloaded.repl/set-init! #(system/only-stream (config) {:file nil :position 0}))
-;; (reloaded.repl/set-init! #(system/with-initial-load (config)))
+;; (reloaded.repl/set-init! #(system/only-stream (config) {:file "some-valid-filename.000010" :position 0}))
+(reloaded.repl/set-init! #(system/with-initial-load (config)))
 
 (defn reset []
   (reloaded.repl/reset))
@@ -38,6 +38,8 @@
   (reset)
   (init)
 
+  (config)
+
   (-> system :loader :out-rows deref count)
   (-> system :loader :out-rows deref first)
   (-> system :loader :out-rows deref last)
@@ -49,6 +51,8 @@
   (-> system :streamer :binlog-pos)
 
   (reloaded.repl/stop)
+
+  (dumpr/valid-binlog-pos? (:conf system) {:file "Tamma-bin.000013" :position 0})
   )
 
 

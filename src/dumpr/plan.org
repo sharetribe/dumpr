@@ -7,11 +7,11 @@
  - [X] cache table schemas
  - [X] Convert text type columns to strings using proper encoding
  - [X] Automated tests for loading and streaming
- - [ ] What happens if the given binary log position is invalid
- - [ ] What happens if DB connection drops, can we reconnect?
+ - [X] What happens if DB connection drops, can we reconnect?
+ - [ ] Automated tests for connection failures and resuming?
+ - [X] Validate given binlog stream start positition against available positions
  - [ ] Create an example application that uses Dumpr library
  - [ ] stop event handling
- - [X] testing strategy
  - [ ] channel metrics
  - [ ] Test nexted tx?
  - [ ] write good README
