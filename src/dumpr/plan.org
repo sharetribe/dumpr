@@ -6,6 +6,7 @@
  - [X] Database filtering
  - [X] cache table schemas
  - [X] Convert text type columns to strings using proper encoding
+ - [X] Automated tests for loading and streaming
  - [ ] What happens if the given binary log position is invalid
  - [ ] What happens if DB connection drops, can we reconnect?
  - [ ] Create an example application that uses Dumpr library

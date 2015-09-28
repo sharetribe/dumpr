@@ -28,7 +28,7 @@ Tests also need a test database to use. By default this database is
 $ mysql -u root
 mysql> create database dumpr_test_db_123;
 mysql> grant all privileges on dumpr_test_db_123.* to 'dumpr_test'@'localhost' identified by 'dumpr_test';
-mysql> grant replication client on *.* to 'dumpr_test'@'localhost';
+mysql> grant replication slave on *.* to 'dumpr_test'@'localhost';
 ```
 
 You can also do this by running the included script:
