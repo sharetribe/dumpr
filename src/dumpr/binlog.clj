@@ -8,7 +8,7 @@
             BinaryLogClient$LifecycleListener]))
 
 
-(defn lifecycle-listener [out]
+(defn lifecycle-listener []
   (reify
     BinaryLogClient$LifecycleListener
     (onConnect [this client]
@@ -32,9 +32,13 @@
   client will start reading binary log at given file and
   position. Events are written to out channel. Out is closed on client
   disconnect."
-  [{:keys [
-           host port user password server-id
-           stream-keepalive-interval stream-keepalive-timeout]}
+  [{:keys [host
+           port
+           user
+           password
+           server-id
+           stream-keepalive-interval
+           stream-keepalive-timeout]}
    {:keys [file position]}
    out]
   (doto (BinaryLogClient. host port user password)
@@ -44,8 +48,9 @@
     (.setKeepAliveInterval stream-keepalive-interval)
     (.setKeepAliveConnectTimeout stream-keepalive-timeout)
     (.registerEventListener (event-listener out))
-    (.registerLifecycleListener (lifecycle-listener out))))
+    (.registerLifecycleListener (lifecycle-listener))))
 
+;; TODO configurable connection timeout?
 (defn start-client [^BinaryLogClient client]
   (.connect client 3000))
 

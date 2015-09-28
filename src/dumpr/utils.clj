@@ -1,7 +1,8 @@
 (ns dumpr.utils)
 
 (defn retry
-  "Run the given function. If it throws, retry. Provide optional parameters to control the retry logic"
+  "Run the given function. If it throws, retry. Provide optional
+  parameters to control the retry logic."
   ([f] (retry f identity))
   ([f handler] (retry f handler (constantly true)))
   ([f handler should-retry?] (retry f handler should-retry? (* 120 1000)))

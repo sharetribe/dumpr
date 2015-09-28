@@ -63,9 +63,13 @@
       :binlog-pos binlog-pos})))
 
 (defn binlog-stream
-  ([conf binlog-pos] (binlog-stream conf binlog-pos nil (chan stream-buffer-default-size)))
-  ([conf binlog-pos tables] (binlog-stream conf binlog-pos tables (chan stream-buffer-default-size)))
-  ([conf binlog-pos tables out]
+  ([conf binlog-pos]
+   (binlog-stream conf binlog-pos nil (chan stream-buffer-default-size)))
+
+  ([conf binlog-pos only-tables]
+   (binlog-stream conf binlog-pos only-tables (chan stream-buffer-default-size)))
+
+  ([conf binlog-pos only-tables out]
    (let [db-spec            (:db-spec conf)
          db                 (get-in conf [:conn-params :db])
          id-fns             (:id-fns conf)
@@ -77,7 +81,7 @@
                                   (stream/add-binlog-filename (:filename binlog-pos))
                                   stream/group-table-maps
                                   (stream/filter-database db)
-                                  (stream/filter-tables (set tables)))
+                                  (stream/filter-tables (set only-tables)))
          events-ch          (chan 1 events-xform)
          schema-loaded-ch   (chan 1)
          stopped            (atom false)
@@ -91,8 +95,7 @@
                                :db-spec db-spec
                                :id-fns id-fns
                                :keepalive-interval keepalive-interval
-                               :stopped stopped
-                               })
+                               :stopped stopped})
      (async/pipeline 4
                      out
                      (comp (map stream/convert-with-schema)
