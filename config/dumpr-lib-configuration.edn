@@ -11,7 +11,11 @@
                :host "127.0.0.1"
                :port 3306
                :db "${DB:dumpr_test_db_123}"
-               :server-id 123}          ; Has to be unique within replication cluster
+               :server-id 123          ; Has to be unique within replication cluster
+               :stream-keepalive-interval 10000
+               :stream-keepalive-timeout 3000
+               :query-max-keepalive-interval 10000
+               }
  :id-fns      {} ; {:table_no_primary_key :username}
  :tables      [] ; [:table_no_primary_key :another_table]
  :filter-tables #{}

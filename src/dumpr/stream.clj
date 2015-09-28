@@ -1,9 +1,11 @@
 (ns dumpr.stream
   "Transformations for the stream of parsed binlog events."
-  (:require [clojure.core.async :as async :refer [go-loop <! >!]]
+  (:require [clojure.core.async :as async :refer [go go-loop <! >! thread]]
             [schema.core :as s]
             [dumpr.table-schema :as table-schema]
+            [taoensso.timbre :as log]
             [dumpr.query :as query]
+            [dumpr.utils :as utils]
             [dumpr.row-format :as row-format]
             [dumpr.events :as events]))
 
@@ -13,8 +15,6 @@
      (if (reduced? ret)
        (reduced ret)
        ret)))
-
-;; TODO starting streaming in the middle of tx?
 
 (def filter-txs
   "A stateful transducer to filter away canceled
@@ -50,12 +50,13 @@
                  result)
              (rf result input))))))))
 
-(defn add-binlog-filename [init-filename]
+(defn add-binlog-filename
   "Build a stateful transducer to add binlog filename to all
   events. Normally the events data only contains binlog position. This
   transducer tracks the current filename, starting from init-filename,
   and updates the filename from rotate events. Transducer also removes
   the rotate events."
+  [init-filename]
   (fn [rf]
     (let [filename (volatile! init-filename)]
       (fn
@@ -103,9 +104,10 @@
   (filter #(= (->db %) expected-db)))
 
 (defn filter-tables
-  "Returns a transducer that removes events that are not from the
-  given tables. Does not filter events to do not contain
-  table (i.e. alter table event)"
+  "Returns a transducer that removes events that are not from any of
+  the given tables. Does not filter events that do not contain table
+  information (i.e. alter table event). If expected-tables is nil or
+  empty degenerates to an allow all filter."
   [expected-tables]
   (if (seq expected-tables)
     (filter #(let [table (->table %)]
@@ -142,27 +144,44 @@
 (defn- valid-schema? [schema]
   (nil? (validation-error schema)))
 
-(defn- fetch-table-schema [table db db-spec id-fns schema-cache]
-  (if-let [schema (get-from-cache schema-cache table)]
-    schema
-    (let [table-spec (table-schema/->table-spec (keyword table) id-fns)
-          schema     (table-schema/load-schema db-spec db table-spec)]
-      (add-to-cache! schema-cache table schema)
-      schema)))
+(defn- fetch-table-schema
+  [table db {:keys [db-spec id-fns schema-cache keepalive-interval stopped]}]
+  (go
+    (if-let [schema (get-from-cache schema-cache table)]
+      schema
+      (let [table-spec (table-schema/->table-spec (keyword table) id-fns)
+            schema     (<!
+                        (thread
+                          (utils/retry
+                           #(table-schema/load-schema db-spec db table-spec)
+                           #(log/warn (str "Table load failed. Trying again in " %2 " ms") %1)
+                           #(not @stopped)
+                           keepalive-interval)))]
+        (add-to-cache! schema-cache table schema)
+        schema))))
 
-(defn with-table-schema
-  [event-pair db-spec id-fns schema-cache]
-  (let [[table-map mutation] event-pair]
-    (if (= (events/event-type table-map) :table-map)
-      (let [{:keys [db table]} (events/event-data table-map)
-            schema             (fetch-table-schema table db db-spec id-fns schema-cache)]
-        (if (valid-schema? schema)
-          [(assoc-in table-map [1 :schema] schema) mutation]
-          [(row-format/error "Invalid schema"
-                             {:schema schema :db db :table table}
-                             {:table-meta (events/event-meta table-map)
-                              :error (validation-error schema)})]))
-      table-map)))
+(defn- with-table-schema
+  [event-pair opts]
+  (go
+    (let [[table-map mutation] event-pair]
+      (if (= (events/event-type table-map) :table-map)
+        (let [{:keys [db table]} (events/event-data table-map)
+              schema             (<! (fetch-table-schema table db opts))]
+          (cond
+            (nil? schema)                [(row-format/error
+                                           "Couldn't load the schema.  Maybe the binlog client was stopped?"
+                                           {:schema schema :db
+                                           db :table table}
+                                           {:table-meta (events/event-meta
+                                           table-map)
+                                            :error nil})]
+            (not (valid-schema? schema)) [(row-format/error
+                                           "Invalid schema"
+                                           {:schema schema :db db :table table}
+                                           {:table-meta (events/event-meta table-map)
+                                            :error (validation-error schema)})]
+            :else                        [(assoc-in table-map [1 :schema] schema) mutation]))
+        table-map))))
 
 (defn add-table-schema
   "Processes event-pairs from in channel and adds a schema to the
@@ -170,21 +189,20 @@
   resulting enriched event-pairs to out channel. If the event-pair
   contains a :alter-table event then that event is filtered and schema
   cache is cleared."
-  [out in {:keys [db-spec id-fns schema-cache]}]
+  [out in {:keys [schema-cache] :as opts}]
   (go-loop []
     (if-some [event-pair (<! in)]
       (let [[table-map _] event-pair]
         (if (= (events/event-type table-map) :alter-table)
           (do (clear-schema-cache! schema-cache)
               (recur))
-          (do (>! out (with-table-schema event-pair db-spec id-fns schema-cache))
+          (do (>! out (<! (with-table-schema event-pair opts)))
               (recur))))
       (async/close! out))))
 
-(defn convert-text [col #^bytes val]
+(defn- convert-text [col #^bytes val]
   (when val
-    (String. val
-             (java.nio.charset.Charset/forName (:character-set col)))))
+    (String. val (java.nio.charset.Charset/forName (:character-set col)))))
 
 (defmulti convert-type :type)
 (defmethod convert-type :tinytext   [col val] (convert-text col val))
@@ -200,7 +218,7 @@
 
 (defn- ->row-format
   [row-data mutation-type table id-fn cols meta]
-  (let [mapped-row   (->name-value cols row-data)
+  (let [mapped-row (->name-value cols row-data)
         id         (id-fn mapped-row)]
     (if (= :delete mutation-type)
       (row-format/delete table id mapped-row meta)

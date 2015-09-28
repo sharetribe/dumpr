@@ -63,41 +63,52 @@
       :binlog-pos binlog-pos})))
 
 (defn binlog-stream
-  ([conf binlog-pos] (binlog-stream conf binlog-pos nil (chan stream-buffer-default-size)))
-  ([conf binlog-pos tables] (binlog-stream conf binlog-pos tables (chan stream-buffer-default-size)))
-  ([conf binlog-pos tables out]
-   (let [db-spec          (:db-spec conf)
-         db               (get-in conf [:conn-params :db])
-         id-fns           (:id-fns conf)
-         schema-cache     (atom {})
-         events-xform     (comp (map events/parse-event)
-                                (remove nil?)
-                                stream/filter-txs
-                                (stream/add-binlog-filename (:filename binlog-pos))
-                                stream/group-table-maps
-                                (stream/filter-database db)
-                                (stream/filter-tables (set tables)))
-         events-ch        (chan 1 events-xform)
-         schema-loaded-ch (chan 1)
-         client           (binlog/new-binlog-client (:conn-params conf)
-                                                    binlog-pos
-                                                    events-ch)]
+  ([conf binlog-pos]
+   (binlog-stream conf binlog-pos nil (chan stream-buffer-default-size)))
+
+  ([conf binlog-pos only-tables]
+   (binlog-stream conf binlog-pos only-tables (chan stream-buffer-default-size)))
+
+  ([conf binlog-pos only-tables out]
+   (let [db-spec            (:db-spec conf)
+         db                 (get-in conf [:conn-params :db])
+         id-fns             (:id-fns conf)
+         keepalive-interval (get-in conf [:conn-params :query-max-keepalive-interval])
+         schema-cache       (atom {})
+         events-xform       (comp (map events/parse-event)
+                                  (remove nil?)
+                                  stream/filter-txs
+                                  (stream/add-binlog-filename (:filename binlog-pos))
+                                  stream/group-table-maps
+                                  (stream/filter-database db)
+                                  (stream/filter-tables (set only-tables)))
+         events-ch          (chan 1 events-xform)
+         schema-loaded-ch   (chan 1)
+         stopped            (atom false)
+         client             (binlog/new-binlog-client (:conn-params conf)
+                                                      binlog-pos
+                                                      events-ch)]
+
      (stream/add-table-schema schema-loaded-ch
                               events-ch
                               {:schema-cache schema-cache
                                :db-spec db-spec
-                               :id-fns id-fns})
+                               :id-fns id-fns
+                               :keepalive-interval keepalive-interval
+                               :stopped stopped})
      (async/pipeline 4
                      out
                      (comp (map stream/convert-with-schema)
                            cat)
                      schema-loaded-ch)
      {:client client
-      :out out})))
+      :out out
+      :stopped stopped})))
 
 
 (defn start-binlog-stream [stream]
   (binlog/start-client (:client stream)))
 
 (defn close-binlog-stream [stream]
+  (reset! (:stopped stream) true)
   (binlog/stop-client (:client stream)))
