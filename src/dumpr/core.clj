@@ -62,6 +62,30 @@
      {:out out
       :binlog-pos binlog-pos})))
 
+(defn valid-binlog-pos?
+  "Validate that the given binlog position is available at the DB
+  server and streaming can be started from this position.
+
+  Note! The validation is not perfect. It will check the given
+  position against available files and their max positions but cannot
+  tell if a position is in the middle of an event. In practice this
+  never occurs when the continue position is fetched from an event
+  produced by the lib."
+  [conf binlog-pos]
+  (let [db-spec                 (:db-spec conf)
+        {:keys [file position]} binlog-pos
+        valid-positions         (query/show-binlog-positions db-spec)]
+    (->> valid-positions
+         (some (fn [{:keys [log_name file_size]}]
+                 (and (= log_name file)
+                      (<= position file_size))))
+         boolean)))
+
+(defn- validate-binlog-pos! [conf binlog-pos]
+  (when-not (valid-binlog-pos? conf binlog-pos)
+    (throw (ex-info "Invalid binary log position."
+                    {:binlog-pos binlog-pos}))))
+
 (defn binlog-stream
   ([conf binlog-pos]
    (binlog-stream conf binlog-pos nil (chan stream-buffer-default-size)))
@@ -70,6 +94,7 @@
    (binlog-stream conf binlog-pos only-tables (chan stream-buffer-default-size)))
 
   ([conf binlog-pos only-tables out]
+   (validate-binlog-pos! conf binlog-pos)
    (let [db-spec            (:db-spec conf)
          db                 (get-in conf [:conn-params :db])
          id-fns             (:id-fns conf)
