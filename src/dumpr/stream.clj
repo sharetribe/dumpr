@@ -168,19 +168,22 @@
         (let [{:keys [db table]} (events/event-data table-map)
               schema             (<! (fetch-table-schema table db opts))]
           (cond
-            (nil? schema)                [(row-format/error
-                                           "Couldn't load the schema.  Maybe the binlog client was stopped?"
-                                           {:schema schema :db
-                                           db :table table}
-                                           {:table-meta (events/event-meta
-                                           table-map)
-                                            :error nil})]
-            (not (valid-schema? schema)) [(row-format/error
-                                           "Invalid schema"
-                                           {:schema schema :db db :table table}
-                                           {:table-meta (events/event-meta table-map)
-                                            :error (validation-error schema)})]
-            :else                        [(assoc-in table-map [1 :schema] schema) mutation]))
+            (nil? schema)
+            [(row-format/error
+              "Couldn't load the schema. Maybe the binlog client was stopped?"
+              {:schema schema :db db :table table}
+              {:table-meta (events/event-meta table-map)
+               :error nil})]
+
+            (not (valid-schema? schema))
+            [(row-format/error
+              "Invalid schema"
+              {:schema schema :db db :table table}
+              {:table-meta (events/event-meta table-map)
+               :error (validation-error schema)})]
+
+            :else
+            [(assoc-in table-map [1 :schema] schema) mutation]))
         table-map))))
 
 (defn add-table-schema
@@ -248,3 +251,14 @@
          #(->row-format % mutation-type table id-fn cols meta)
          rows))
       event-pair)))
+
+(def parse-events
+  (comp (map events/parse-event)
+        (remove nil?)))
+
+(defn process-events [binlog-pos db only-tables]
+  (comp filter-txs
+        (add-binlog-filename (:filename binlog-pos))
+        group-table-maps
+        (filter-database db)
+        (filter-tables (set only-tables))))

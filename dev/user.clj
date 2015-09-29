@@ -50,6 +50,8 @@
   (-> system :streamer :out-events deref)
   (-> system :streamer :binlog-pos)
 
+  (-> system :conf)
+
   (reloaded.repl/stop)
 
   (dumpr/valid-binlog-pos? (:conf system) {:file "Tamma-bin.000013" :position 0})

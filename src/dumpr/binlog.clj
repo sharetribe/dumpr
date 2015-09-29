@@ -50,9 +50,8 @@
     (.registerEventListener (event-listener out))
     (.registerLifecycleListener (lifecycle-listener))))
 
-;; TODO configurable connection timeout?
-(defn start-client [^BinaryLogClient client]
-  (.connect client 3000))
+(defn start-client [^BinaryLogClient client timeout]
+  (.connect client timeout))
 
 (defn stop-client [^BinaryLogClient client]
   (.disconnect client))

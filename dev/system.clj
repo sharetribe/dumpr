@@ -66,9 +66,9 @@
     (if-not (some? (:stream this))
       (let [binlog-pos (or (:binlog-pos this)
                            (-> loader :result :binlog-pos))
-            stream (dumpr/binlog-stream conf binlog-pos (:filter-tables this))
+            stream (dumpr/create-stream conf binlog-pos (:filter-tables this))
             out-events (sink (:out stream) println)]
-        (dumpr/start-binlog-stream stream)
+        (dumpr/start-stream stream)
         (-> this
             (assoc :binlog-pos binlog-pos)
             (assoc :out-events out-events)
@@ -76,7 +76,7 @@
 
   (stop [this]
     (when (some? (:stream this))
-      (dumpr/close-binlog-stream (:stream this)))
+      (dumpr/stop-stream (:stream this)))
     (dissoc this :stream)))
 
 (defn create-stream-continue [conf binlog-pos filter-tables]

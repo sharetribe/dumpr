@@ -18,20 +18,47 @@
 ;; Public API
 ;;
 
+(def #^:private conn-param-defaults
+  {:stream-keepalive-interval 60000
+   :stream-keepalive-timeout 3000
+   :initial-connection-timeout 3000
+   :query-max-keepalive-interval 60000})
+
 (defn create-conf
-  "Create configuration needed by stream and table load.
+  "Create a common configuration needed by stream and table load.
   Takes two params:
 
-  :conn-params Map that contains the following keys:
-               :user, :password, :host, :port, :db and :server-id
+  :conn-params Database connection parameters map. Expected keys are
+    :user - Database username
+    :host - Database host
+    :port - Database port
+    :db   - The name of the database. You can stream exactly one db.
+    :server-id - Unique id in mysql cluster. Dumpr is a replication slave
+    :stream-keepalive-interval - Frequency for attempting to
+     re-establish a lost connection. Defaults to 1 minute.
+    :stream-keepalive-timeout - Timeout for an attempt to restore
+     connection, defaults to 3 seconds
+    :initial-connection-timeout - Timeout for attempting first
+     connect, defaults to 3 seconds.
+    :query-max-keepalive-interval - Maximum backoff period between
+     failed attempts at loading schema info for a table. Backoff
+     policy is exponentially increasing up to this max value. Defaults
+     to 1 minute.
+
   :id-fns      Maps table name (key) to function (value) that returns the
                identifier value for that table row. Normally you'll be using
                the identifier column as a keyword as the id function
-               (e.g. {:mytable :identifier})"
-  [conn-params id-fns]
-  {:db-spec (query/db-spec conn-params)
-   :conn-params conn-params
-   :id-fns id-fns})
+               (e.g. {:mytable :identifier})
+
+  :db-spec     The db-spec passed to JDBC when querying database. This is
+               optional and should normally be left out. By default
+               db-spec is built from conn-params but it can be
+               overridden to use a connection pool."
+  ([conn-params id-fns] (create-conf conn-params id-fns nil))
+  ([conn-params id-fns db-spec]
+   {:db-spec     (or db-spec (query/db-spec conn-params))
+    :conn-params (merge conn-param-defaults conn-params)
+    :id-fns      id-fns}))
 
 (defn load-tables
   "Load the contents of given tables from the DB and return the
@@ -86,12 +113,18 @@
     (throw (ex-info "Invalid binary log position."
                     {:binlog-pos binlog-pos}))))
 
-(defn binlog-stream
+(defn create-stream
+  "Create a new binlog stream using the given conf that will start
+  streaming from binlog-pos position. Optional parameters are:
+
+  only-tables - Only stream events from this set of tables
+  out - Output buffer to use. Defaults to a small blocking buffer where
+  consumption is expected to keep up with stream volume."
   ([conf binlog-pos]
-   (binlog-stream conf binlog-pos nil (chan stream-buffer-default-size)))
+   (create-stream conf binlog-pos nil (chan stream-buffer-default-size)))
 
   ([conf binlog-pos only-tables]
-   (binlog-stream conf binlog-pos only-tables (chan stream-buffer-default-size)))
+   (create-stream conf binlog-pos only-tables (chan stream-buffer-default-size)))
 
   ([conf binlog-pos only-tables out]
    (validate-binlog-pos! conf binlog-pos)
@@ -100,13 +133,9 @@
          id-fns             (:id-fns conf)
          keepalive-interval (get-in conf [:conn-params :query-max-keepalive-interval])
          schema-cache       (atom {})
-         events-xform       (comp (map events/parse-event)
-                                  (remove nil?)
-                                  stream/filter-txs
-                                  (stream/add-binlog-filename (:filename binlog-pos))
-                                  stream/group-table-maps
-                                  (stream/filter-database db)
-                                  (stream/filter-tables (set only-tables)))
+         events-xform       (comp
+                             stream/parse-events
+                             (stream/process-events binlog-pos db only-tables))
          events-ch          (chan 1 events-xform)
          schema-loaded-ch   (chan 1)
          stopped            (atom false)
@@ -126,14 +155,17 @@
                      (comp (map stream/convert-with-schema)
                            cat)
                      schema-loaded-ch)
-     {:client client
+     {:conf conf
+      :client client
       :out out
       :stopped stopped})))
 
 
-(defn start-binlog-stream [stream]
-  (binlog/start-client (:client stream)))
+(defn start-stream [stream]
+  (binlog/start-client
+   (:client stream)
+   (get-in stream [:conf :conn-params :initial-connection-timeout])))
 
-(defn close-binlog-stream [stream]
+(defn stop-stream [stream]
   (reset! (:stopped stream) true)
   (binlog/stop-client (:client stream)))
