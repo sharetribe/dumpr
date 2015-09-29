@@ -8,20 +8,19 @@
   :dependencies [[org.clojure/clojure "1.7.0"]
                  [org.clojure/core.async "0.1.346.0-17112a-alpha"]
                  [mysql/mysql-connector-java "5.1.36"]
-                 [org.clojure/java.jdbc "0.4.1"]
-                 [prismatic/schema "1.0.0"]
-                 [com.taoensso/timbre "4.1.1"]
-                 [com.github.shyiko/mysql-binlog-connector-java "0.2.2"]]
+                 [org.clojure/java.jdbc "0.4.2"]
+                 [prismatic/schema "1.0.1"]
+                 [com.taoensso/timbre "4.1.2"]
+                 [com.github.shyiko/mysql-binlog-connector-java "0.2.3"]]
 
   :global-vars {*warn-on-reflection* true}
   :min-lein-version "2.5.0"
 
-  :profiles {
-             :dev {:source-paths ["config" "dev"]
+  :profiles {:dev {:source-paths ["config" "dev"]
                    :dependencies [[com.stuartsierra/component "0.2.3"]
                                   [reloaded.repl "0.2.0"]
                                   [io.aviso/config "0.1.7"]
                                   [joplin.core "0.3.3"]
                                   [joplin.jdbc "0.3.3"]
-                                  [org.clojure/test.check "0.8.1"]
-                                  [com.gfredericks/test.chuck "0.1.22"]]}})
+                                  [org.clojure/test.check "0.8.2"]
+                                  [com.gfredericks/test.chuck "0.2.0"]]}})
