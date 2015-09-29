@@ -4,6 +4,7 @@
             [clojure.core.async :as async :refer [chan >!!]]
             [schema.core :as s]
             [taoensso.timbre :as log]
+            [manifold.stream]
             [dumpr.query :as query]
             [dumpr.table-schema :as table-schema]
             [dumpr.events :as events]
@@ -60,21 +61,29 @@
     :conn-params (merge conn-param-defaults conn-params)
     :id-fns      id-fns}))
 
+(defn- ->connected-source [ch]
+  (let [stream (manifold.stream/stream)]
+    (manifold.stream/connect ch stream)
+    stream))
+
 (defn load-tables
   "Load the contents of given tables from the DB and return the
   results as :upsert rows via out channel. Tables are given as a
   vector of table keywords. Keyword is mapped to table name using
   (name table-kw). Loading happens in the order that tables were
   given. Results are returned strictly in the order that tables were
-  given. Out channel can be specified if specific buffer size or
-  behavior is desired. Result map has following fields:
+  given. Policy for out channel can be specified if specific buffer
+  size (as long) or behavior (as core.async channel) is
+  desired. Note that the return value is always a Manifold source
+  despite the possible out channel you provide. Result map has
+  following fields:
 
-  :out        The out chan for result rows. Closed when
+  :out        A Manifold source for result rows. Drained when
               all tabels are loaded
   :binlog-pos Binlog position *before* table load started.
               Use this to start binlog consuming."
   ([tables conf] (load-tables tables conf (chan load-buffer-default-size)))
-  ([tables {:keys [db-spec conn-params id-fns]} out]
+  ([tables {:keys [db-spec conn-params id-fns]} out-ch]
    (let [db          (:db conn-params)
          binlog-pos  (query/binlog-position db-spec)
          tables-ch   (chan 0)
@@ -83,10 +92,10 @@
                       tables db-spec db id-fns)]
 
      (async/pipeline-async 1
-                           out
+                           out-ch
                            (partial query/stream-table db-spec)
                            schema-chan)
-     {:out out
+     {:out (->connected-source out-ch)
       :binlog-pos binlog-pos})))
 
 (defn valid-binlog-pos?
@@ -118,15 +127,20 @@
   streaming from binlog-pos position. Optional parameters are:
 
   only-tables - Only stream events from this set of tables
-  out - Output buffer to use. Defaults to a small blocking buffer where
-  consumption is expected to keep up with stream volume."
+  out - Output buffer policy to use (buffer size as long or a
+        core.async channel). Defaults to a small blocking buffer where
+        consumption is expected to keep up with the stream volume.
+
+  Returns a stream map where events are written onto a Manifold source
+  that is the value of key :out. Rest of the keys should be considered
+  implementation details and are subject to change."
   ([conf binlog-pos]
    (create-stream conf binlog-pos nil (chan stream-buffer-default-size)))
 
   ([conf binlog-pos only-tables]
    (create-stream conf binlog-pos only-tables (chan stream-buffer-default-size)))
 
-  ([conf binlog-pos only-tables out]
+  ([conf binlog-pos only-tables out-ch]
    (validate-binlog-pos! conf binlog-pos)
    (let [db-spec            (:db-spec conf)
          db                 (get-in conf [:conn-params :db])
@@ -151,13 +165,14 @@
                                :keepalive-interval keepalive-interval
                                :stopped stopped})
      (async/pipeline 4
-                     out
+                     out-ch
                      (comp (map stream/convert-with-schema)
                            cat)
                      schema-loaded-ch)
      {:conf conf
       :client client
-      :out out
+      :out (->connected-source out-ch)
+      :close! #(async/close! out-ch)
       :stopped stopped})))
 
 
@@ -168,4 +183,5 @@
 
 (defn stop-stream [stream]
   (reset! (:stopped stream) true)
-  (binlog/stop-client (:client stream)))
+  (binlog/stop-client (:client stream))
+  ((:close! stream)))

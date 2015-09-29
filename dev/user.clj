@@ -4,7 +4,9 @@
             [dumpr.core :as dumpr]
             [clojure.core.async :as async :refer [<! go-loop >! timeout]]
             [taoensso.timbre :as log]
-            [io.aviso.config :as config]))
+            [io.aviso.config :as config]
+            [manifold.stream :as s]
+            [manifold.deferred :as d]))
 
 (Thread/setDefaultUncaughtExceptionHandler
  (reify Thread$UncaughtExceptionHandler
