@@ -4,7 +4,9 @@
             [dumpr.core :as dumpr]
             [clojure.core.async :as async :refer [<! go-loop >! timeout]]
             [taoensso.timbre :as log]
-            [io.aviso.config :as config]))
+            [io.aviso.config :as config]
+            [manifold.stream :as s]
+            [manifold.deferred :as d]))
 
 (Thread/setDefaultUncaughtExceptionHandler
  (reify Thread$UncaughtExceptionHandler
@@ -16,7 +18,7 @@
                                   :profiles [:lib :dev]
                                   :schemas [LibConf]}))
 
-;; (reloaded.repl/set-init! #(system/only-stream (config) {:file "some-valid-filename.000010" :position 0}))
+;; (reloaded.repl/set-init! #(system/only-stream (config) {:file "Tamma-bin.000012" :position 0}))
 (reloaded.repl/set-init! #(system/with-initial-load (config)))
 
 (defn reset []
@@ -48,7 +50,7 @@
   (-> system :streamer :out-events deref first)
   (-> system :streamer :out-events deref last)
   (-> system :streamer :out-events deref)
-  (-> system :streamer :binlog-pos)
+  (-> system :streamer :stream)
 
   (-> system :conf)
 

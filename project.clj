@@ -11,7 +11,8 @@
                  [org.clojure/java.jdbc "0.4.2"]
                  [prismatic/schema "1.0.1"]
                  [com.taoensso/timbre "4.1.2"]
-                 [com.github.shyiko/mysql-binlog-connector-java "0.2.3"]]
+                 [com.github.shyiko/mysql-binlog-connector-java "0.2.3"]
+                 [manifold "0.1.0"]]
 
   :global-vars {*warn-on-reflection* true}
   :min-lein-version "2.5.0"

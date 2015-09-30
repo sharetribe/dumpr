@@ -1,8 +1,9 @@
 (ns system
   (:require [clojure.core.async :as async :refer [go-loop <!]]
             [com.stuartsierra.component :as component]
-            [schema.core :as s]
             [io.aviso.config :as config]
+            [manifold.stream]
+            [schema.core :as s]
             [dumpr.core :as dumpr]))
 
 (s/defschema LibConf
@@ -26,30 +27,34 @@
                    :environments {s/Keyword [s/Any]}}})
 
 
-(defn sink
-  "Returns an atom containing a vector. Consumes values from channel
-  ch and conj's them into the atom."
-  ([ch] (sink ch identity))
-  ([ch pr]
+(defn sink-source
+  "Returns an atom containing a vector. Consumes values from the
+  Manifold source and conj's sthem into the atom."
+  ([source] (sink-source source identity))
+  ([source pr]
    (let [a (atom [])]
-     (go-loop []
-       (let [val (<! ch)]
-         (if-not (nil? val)
-           (do
-             (pr val)
-             (swap! a conj val)
-             (recur))
-           (pr "Channel closed."))))
+
+     (manifold.stream/consume
+      (fn [val]
+        (pr val)
+        (swap! a conj val))
+      source)
+
+     (manifold.stream/on-drained
+      source
+      #(pr "Source closed."))
+
      a)))
 
 (defrecord Loader [conf tables]
   component/Lifecycle
     (start [this]
       (if-not (some? (:result this))
-        (let [result (dumpr/load-tables tables conf)
-              out-rows (sink (:out result))]
+        (let [stream (dumpr/create-table-stream tables conf)
+              _ (dumpr/start-stream! stream)
+              out-rows (sink-source (dumpr/source stream))]
           (-> this
-              (assoc :result result)
+              (assoc :stream stream)
               (assoc :out-rows out-rows)))))
 
     (stop [this]
@@ -65,10 +70,10 @@
   (start [this]
     (if-not (some? (:stream this))
       (let [binlog-pos (or (:binlog-pos this)
-                           (-> loader :result :binlog-pos))
-            stream (dumpr/create-stream conf binlog-pos (:filter-tables this))
-            out-events (sink (:out stream) println)]
-        (dumpr/start-stream stream)
+                           (-> loader :stream dumpr/next-position))
+            stream (dumpr/create-binlog-stream conf binlog-pos (:filter-tables this))
+            out-events (sink-source (dumpr/source stream) println)]
+        (dumpr/start-stream! stream)
         (-> this
             (assoc :binlog-pos binlog-pos)
             (assoc :out-events out-events)
@@ -76,7 +81,7 @@
 
   (stop [this]
     (when (some? (:stream this))
-      (dumpr/stop-stream (:stream this)))
+      (dumpr/stop-stream! (:stream this)))
     (dissoc this :stream)))
 
 (defn create-stream-continue [conf binlog-pos filter-tables]

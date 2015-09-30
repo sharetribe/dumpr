@@ -3,6 +3,7 @@
             [clojure.core.async :as async :refer [<! >! <!! go-loop chan]]
             [joplin.repl :as repl]
             [io.aviso.config :as config]
+            [manifold.stream]
             [system :refer [LibConf]]))
 
 (defn config []
@@ -23,25 +24,29 @@
   (with-out-str (repl/reset (joplin-config) :test :sql-test)))
 
 (defn sink-to-coll
-  "Sink a channel into a collection. Return a channel that will get a
-  single value, the resulting collection, upon in channel being
-  closed."
-  ([in]
-   (go-loop [res (transient [])]
-     (let [val (<! in)]
-       (if-not (nil? val)
-         (recur (conj! res val))
-         (persistent! res)))))
-  ([in n]
-   (go-loop [res (transient [])
-             cnt n]
-     (if (<= cnt 0)
-       (persistent! res)
+  "Sink a manifold source into a collection. Return a core.async
+  channel that will get a single value, the resulting collection, upon
+  source being closed or after n elements consumed."
+  ([source]
+   (let [in (chan)
+         _ (manifold.stream/connect source in)]
+     (go-loop [res (transient [])]
        (let [val (<! in)]
-         (if (nil? val)
-           (persistent! res)
-           (recur (conj! res val)
-                  (dec cnt))))))))
+         (if-not (nil? val)
+           (recur (conj! res val))
+           (persistent! res))))))
+  ([source n]
+   (let [in (chan)
+         _ (manifold.stream/connect source in)]
+     (go-loop [res (transient [])
+               cnt n]
+       (if (<= cnt 0)
+         (persistent! res)
+         (let [val (<! in)]
+           (if (nil? val)
+             (persistent! res)
+             (recur (conj! res val)
+                    (dec cnt)))))))))
 
 (defn into-test-db!
   "Interpret the given ordered ops sequence as SQL inserts, updates
