@@ -130,9 +130,10 @@
 (defn- load-tables-to-coll [tables]
   (let [{:keys [conn-params]} (test-util/config)
         conf (dumpr/create-conf conn-params {})
-        res (dumpr/load-tables tables conf)]
-    {:out (<!! (test-util/sink-to-coll (:out res)))
-     :binlog-pos (:binlog-pos res)}))
+        stream (dumpr/create-table-stream tables conf)
+        _ (dumpr/start-stream! stream)]
+    {:out (<!! (test-util/sink-to-coll (dumpr/source stream)))
+     :binlog-pos (dumpr/next-position stream)}))
 
 (defn- create-and-start-stream [binlog-pos tables]
   (let [{:keys [conn-params]} (test-util/config)
@@ -140,12 +141,12 @@
         stream (if (seq tables)
                  (dumpr/create-binlog-stream conf binlog-pos #{:widgets :manufacturers})
                  (dumpr/create-binlog-stream conf binlog-pos))]
-    (dumpr/start-stream stream)
+    (dumpr/start-stream! stream)
     stream))
 
 (defn- stream-to-coll-and-close [stream n]
   (let [out (<!! (test-util/sink-to-coll (dumpr/source stream) n))]
-    (dumpr/stop-stream stream)
+    (dumpr/stop-stream! stream)
     out))
 
 

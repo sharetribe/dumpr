@@ -9,7 +9,8 @@
             [dumpr.utils :as utils]
             [dumpr.row-format :as row-format]
             [dumpr.events :as events]
-            [dumpr.binlog :as binlog]))
+            [dumpr.binlog :as binlog]
+            [dumpr.table-schema :as table-schema]))
 
 (defn- preserving-reduced
   [rf]
@@ -266,6 +267,12 @@
         (filter-tables (set only-tables))))
 
 
+(defn- ->connected-source [ch]
+  (let [stream (manifold.stream/stream)]
+    (manifold.stream/connect ch stream)
+    stream))
+
+
 (defprotocol IStartable
   (start! [this] "Start the given stream if not already started."))
 
@@ -274,6 +281,40 @@
 
 (defprotocol ISourceable
   (source [this] "Return the stream output as a Manifold source."))
+
+(defprotocol INextPosition
+  (next-position [this]
+    "Return the binlog position to use to continue streaming."))
+
+(defrecord TableLoadStream [conf tables binlog-pos out-ch out-stream started?]
+  IStartable
+  (start! [_]
+    (when-not @started?
+      (let [{:keys [db-spec conn-params id-fns]} conf
+            db (:db conn-params)
+            position  (query/binlog-position db-spec)
+            schema-chan (table-schema/load-and-parse-schemas
+                         tables db-spec db id-fns)]
+        (async/pipeline-async 1
+                              out-ch
+                              (partial query/stream-table db-spec)
+                              schema-chan)
+        (reset! binlog-pos position))
+      (reset! started? true)))
+
+  ISourceable
+  (source [_] out-stream)
+
+  INextPosition
+  (next-position [_] @binlog-pos))
+
+(defn new-table-load-stream [tables conf out-ch]
+  (map->TableLoadStream {:conf conf
+                         :tables tables
+                         :binlog-pos (atom nil)
+                         :out-ch out-ch
+                         :out-stream (->connected-source out-ch)
+                         :started? (atom nil)}))
 
 (defrecord BinlogStream [conf client out-stream started? stopped?]
   IStartable
@@ -292,11 +333,6 @@
 
   ISourceable
   (source [_] out-stream))
-
-(defn- ->connected-source [ch]
-  (let [stream (manifold.stream/stream)]
-    (manifold.stream/connect ch stream)
-    stream))
 
 (defn new-binlog-stream [conf binlog-pos only-tables out-ch]
   (let [db-spec            (:db-spec conf)

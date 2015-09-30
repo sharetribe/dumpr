@@ -1,5 +1,6 @@
 (ns dumpr.core
-  "Dumpr API"
+  "Dumpr API for consuming MySQL database contents as streams of
+  updates."
   (:require [clojure.java.jdbc :as jdbc]
             [clojure.core.async :as async :refer [chan >!!]]
             [schema.core :as s]
@@ -12,13 +13,6 @@
             [dumpr.binlog :as binlog]
             [dumpr.row-format :as row-format]))
 
-(def load-buffer-default-size 1000)
-(def stream-buffer-default-size 50)
-
-
-;; Public API
-;;
-
 (def #^:private conn-param-defaults
   {:stream-keepalive-interval 60000
    :stream-keepalive-timeout 3000
@@ -26,77 +20,78 @@
    :query-max-keepalive-interval 60000})
 
 (defn create-conf
-  "Create a common configuration needed by stream and table load.
-  Takes two params:
+  "Create a common configuration map needed by stream and table load.
 
-  :conn-params Database connection parameters map. Expected keys are
-    :user - Database username
-    :host - Database host
-    :port - Database port
-    :db   - The name of the database. You can stream exactly one db.
-    :server-id - Unique id in mysql cluster. Dumpr is a replication slave
-    :stream-keepalive-interval - Frequency for attempting to
-     re-establish a lost connection. Defaults to 1 minute.
-    :stream-keepalive-timeout - Timeout for an attempt to restore
-     connection, defaults to 3 seconds
-    :initial-connection-timeout - Timeout for attempting first
-     connect, defaults to 3 seconds.
-    :query-max-keepalive-interval - Maximum backoff period between
-     failed attempts at loading schema info for a table. Backoff
-     policy is exponentially increasing up to this max value. Defaults
-     to 1 minute.
+  conn-params is a database connection parameters map. Expected keys
+  are:
 
-  :id-fns      Maps table name (key) to function (value) that returns the
-               identifier value for that table row. Normally you'll be using
-               the identifier column as a keyword as the id function
-               (e.g. {:mytable :identifier})
+  :user - Database username
+  :host - Database host
+  :port - Database port
+  :db   - The name of the database. You can stream exactly one db.
+  :server-id - Unique id in mysql cluster. Dumpr is a replication slave
+  :stream-keepalive-interval - Frequency for attempting to
+   re-establish a lost connection. Defaults to 1 minute.
+  :stream-keepalive-timeout - Timeout for an attempt to restore
+   connection, defaults to 3 seconds
+  :initial-connection-timeout - Timeout for attempting first connect,
+   defaults to 3 seconds.
+  :query-max-keepalive-interval - Maximum backoff period between
+   failed attempts at loading schema info for a table. Backoff policy
+   is exponentially increasing up to this max value. Defaults to 1
+   minute.
 
-  :db-spec     The db-spec passed to JDBC when querying database. This is
-               optional and should normally be left out. By default
-               db-spec is built from conn-params but it can be
-               overridden to use a connection pool."
+  id-fns maps table name (key) to function (value) that returns the
+  identifier value for that table row. Normally you'll be using the
+  identifier column as a keyword as the id function (e.g. {:mytable
+  :identifier}). Using id fn is only required when the table doesn't
+  have a single column as primary key that could be autodetected, or
+  when you wish to construct id differently on purpose.
+
+  (optional) db-spec is passed to JDBC when querying database. This is
+  optional and should normally be left out. By default db-spec is
+  built from conn-params but it can be explicitly specified to use
+  e.g. a connection pool."
   ([conn-params id-fns] (create-conf conn-params id-fns nil))
   ([conn-params id-fns db-spec]
    {:db-spec     (or db-spec (query/db-spec conn-params))
     :conn-params (merge conn-param-defaults conn-params)
     :id-fns      id-fns}))
 
-(defn- ->connected-source [ch]
-  (let [stream (manifold.stream/stream)]
-    (manifold.stream/connect ch stream)
-    stream))
 
-(defn load-tables
-  "Load the contents of given tables from the DB and return the
-  results as :upsert rows via out channel. Tables are given as a
-  vector of table keywords. Keyword is mapped to table name using
-  (name table-kw). Loading happens in the order that tables were
-  given. Results are returned strictly in the order that tables were
-  given. Policy for out channel can be specified if specific buffer
-  size (as long) or behavior (as core.async channel) is
-  desired. Note that the return value is always a Manifold source
-  despite the possible out channel you provide. Result map has
-  following fields:
+(def load-buffer-default-size 1000)
 
-  :out        A Manifold source for result rows. Drained when
-              all tabels are loaded
-  :binlog-pos Binlog position *before* table load started.
-              Use this to start binlog consuming."
-  ([tables conf] (load-tables tables conf (chan load-buffer-default-size)))
-  ([tables {:keys [db-spec conn-params id-fns]} out-ch]
-   (let [db          (:db conn-params)
-         binlog-pos  (query/binlog-position db-spec)
-         tables-ch   (chan 0)
-         table-specs (chan 0)
-         schema-chan (table-schema/load-and-parse-schemas
-                      tables db-spec db id-fns)]
+(defn create-table-stream
+  "Creates a stream that, when started via start-stream, will load the
+  contents of given tables from the DB. The output of the stream can
+  be consumed as a Manifold source using (source stream).
 
-     (async/pipeline-async 1
-                           out-ch
-                           (partial query/stream-table db-spec)
-                           schema-chan)
-     {:out (->connected-source out-ch)
-      :binlog-pos binlog-pos})))
+  Tables are given as a vector of table keywords. Keyword is mapped to
+  table name using (name table-kw). Loading happens in the order that
+  tables were given. Results are returned strictly in the order that
+  tables were given.
+
+  Policy for out channel can be specified if specific buffer size (as
+  long) or behavior (as core.async channel) is desired. Note that the
+  results are always made available as a Manifold source despite the
+  possible out channel provided.
+
+  The table stream also supports getting tbe binary log position to
+  continue streaming from. This is made available via (next-position
+  stream). This position is recorded when the stream is
+  started. Calling enxt-position before that returns nil."
+  ([tables conf]
+   (create-table-stream tables conf (chan load-buffer-default-size)))
+  ([tables conf out-ch]
+   (stream/new-table-load-stream tables conf out-ch)))
+
+(defn next-position
+  "Return the binlog position to use when continuing streaming after
+  the given initial stream. This only works for a finite stream, i.e.
+  the table load stream and is available only after calling
+  start-stream on stream."
+  [stream]
+  (stream/next-position stream))
 
 (defn valid-binlog-pos?
   "Validate that the given binlog position is available at the DB
@@ -117,11 +112,13 @@
                       (<= position file_size))))
          boolean)))
 
+
 (defn- validate-binlog-pos! [conf binlog-pos]
   (when-not (valid-binlog-pos? conf binlog-pos)
     (throw (ex-info "Invalid binary log position."
                     {:binlog-pos binlog-pos}))))
 
+(def stream-buffer-default-size 50)
 
 (defn create-binlog-stream
   "Create a new binlog stream using the given conf that will start
@@ -132,10 +129,10 @@
         core.async channel). Defaults to a small blocking buffer where
         consumption is expected to keep up with the stream volume.
 
-  Returns a binlog stream instance. Use start and stop to start and
-  stop streaming. Use source to retrieve a Manifold source to consume
-  stream output. Return type being a record is an implementation
-  detail and subject to can change."
+  Returns a binlog stream instance. Use start-stream and stop-stream
+  to start and stop streaming. Use source to retrieve a Manifold
+  source to consume stream output. Return type being a record is an
+  implementation detail and subject to can change."
   ([conf binlog-pos]
    (create-binlog-stream conf binlog-pos nil (chan stream-buffer-default-size)))
 
@@ -147,17 +144,17 @@
    (stream/new-binlog-stream conf binlog-pos only-tables out-ch)))
 
 
-(defn start-stream
+(defn start-stream!
   "Start streaming"
   [stream]
   (stream/start! stream))
 
-(defn stop-stream
+(defn stop-stream!
   "Stop the stream. A stream once stopped cannot be restarted."
   [stream]
   (stream/stop! stream))
 
 (defn source
-  "Get a Manifold source of the stream output."
+  "Get the stream output as a Manifold source."
   [stream]
   (stream/source stream))
