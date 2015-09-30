@@ -122,7 +122,8 @@
     (throw (ex-info "Invalid binary log position."
                     {:binlog-pos binlog-pos}))))
 
-(defn create-stream
+
+(defn create-binlog-stream
   "Create a new binlog stream using the given conf that will start
   streaming from binlog-pos position. Optional parameters are:
 
@@ -131,57 +132,32 @@
         core.async channel). Defaults to a small blocking buffer where
         consumption is expected to keep up with the stream volume.
 
-  Returns a stream map where events are written onto a Manifold source
-  that is the value of key :out. Rest of the keys should be considered
-  implementation details and are subject to change."
+  Returns a binlog stream instance. Use start and stop to start and
+  stop streaming. Use source to retrieve a Manifold source to consume
+  stream output. Return type being a record is an implementation
+  detail and subject to can change."
   ([conf binlog-pos]
-   (create-stream conf binlog-pos nil (chan stream-buffer-default-size)))
+   (create-binlog-stream conf binlog-pos nil (chan stream-buffer-default-size)))
 
   ([conf binlog-pos only-tables]
-   (create-stream conf binlog-pos only-tables (chan stream-buffer-default-size)))
+   (create-binlog-stream conf binlog-pos only-tables (chan stream-buffer-default-size)))
 
   ([conf binlog-pos only-tables out-ch]
    (validate-binlog-pos! conf binlog-pos)
-   (let [db-spec            (:db-spec conf)
-         db                 (get-in conf [:conn-params :db])
-         id-fns             (:id-fns conf)
-         keepalive-interval (get-in conf [:conn-params :query-max-keepalive-interval])
-         schema-cache       (atom {})
-         events-xform       (comp
-                             stream/parse-events
-                             (stream/process-events binlog-pos db only-tables))
-         events-ch          (chan 1 events-xform)
-         schema-loaded-ch   (chan 1)
-         stopped            (atom false)
-         client             (binlog/new-binlog-client (:conn-params conf)
-                                                      binlog-pos
-                                                      events-ch)]
-
-     (stream/add-table-schema schema-loaded-ch
-                              events-ch
-                              {:schema-cache schema-cache
-                               :db-spec db-spec
-                               :id-fns id-fns
-                               :keepalive-interval keepalive-interval
-                               :stopped stopped})
-     (async/pipeline 4
-                     out-ch
-                     (comp (map stream/convert-with-schema)
-                           cat)
-                     schema-loaded-ch)
-     {:conf conf
-      :client client
-      :out (->connected-source out-ch)
-      :close! #(async/close! out-ch)
-      :stopped stopped})))
+   (stream/new-binlog-stream conf binlog-pos only-tables out-ch)))
 
 
-(defn start-stream [stream]
-  (binlog/start-client
-   (:client stream)
-   (get-in stream [:conf :conn-params :initial-connection-timeout])))
+(defn start-stream
+  "Start streaming"
+  [stream]
+  (stream/start! stream))
 
-(defn stop-stream [stream]
-  (reset! (:stopped stream) true)
-  (binlog/stop-client (:client stream))
-  ((:close! stream)))
+(defn stop-stream
+  "Stop the stream. A stream once stopped cannot be restarted."
+  [stream]
+  (stream/stop! stream))
+
+(defn source
+  "Get a Manifold source of the stream output."
+  [stream]
+  (stream/source stream))

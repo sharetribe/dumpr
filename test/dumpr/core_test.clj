@@ -138,13 +138,13 @@
   (let [{:keys [conn-params]} (test-util/config)
         conf (dumpr/create-conf conn-params {})
         stream (if (seq tables)
-                 (dumpr/create-stream conf binlog-pos #{:widgets :manufacturers})
-                 (dumpr/create-stream conf binlog-pos))]
+                 (dumpr/create-binlog-stream conf binlog-pos #{:widgets :manufacturers})
+                 (dumpr/create-binlog-stream conf binlog-pos))]
     (dumpr/start-stream stream)
     stream))
 
 (defn- stream-to-coll-and-close [stream n]
-  (let [out (<!! (test-util/sink-to-coll (:out stream) n))]
+  (let [out (<!! (test-util/sink-to-coll (dumpr/source stream) n))]
     (dumpr/stop-stream stream)
     out))
 

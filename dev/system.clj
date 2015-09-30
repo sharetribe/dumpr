@@ -70,8 +70,8 @@
     (if-not (some? (:stream this))
       (let [binlog-pos (or (:binlog-pos this)
                            (-> loader :result :binlog-pos))
-            stream (dumpr/create-stream conf binlog-pos (:filter-tables this))
-            out-events (sink-source (:out stream) println)]
+            stream (dumpr/create-binlog-stream conf binlog-pos (:filter-tables this))
+            out-events (sink-source (dumpr/source stream) println)]
         (dumpr/start-stream stream)
         (-> this
             (assoc :binlog-pos binlog-pos)

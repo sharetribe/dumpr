@@ -1,13 +1,15 @@
 (ns dumpr.stream
   "Transformations for the stream of parsed binlog events."
-  (:require [clojure.core.async :as async :refer [go go-loop <! >! thread]]
+  (:require [clojure.core.async :as async :refer [go go-loop <! >! thread chan]]
             [schema.core :as s]
             [dumpr.table-schema :as table-schema]
             [taoensso.timbre :as log]
+            [manifold.stream]
             [dumpr.query :as query]
             [dumpr.utils :as utils]
             [dumpr.row-format :as row-format]
-            [dumpr.events :as events]))
+            [dumpr.events :as events]
+            [dumpr.binlog :as binlog]))
 
 (defn- preserving-reduced
   [rf]
@@ -145,7 +147,7 @@
   (nil? (validation-error schema)))
 
 (defn- fetch-table-schema
-  [table db {:keys [db-spec id-fns schema-cache keepalive-interval stopped]}]
+  [table db {:keys [db-spec id-fns schema-cache keepalive-interval running?]}]
   (go
     (if-let [schema (get-from-cache schema-cache table)]
       schema
@@ -155,7 +157,7 @@
                           (utils/retry
                            #(table-schema/load-schema db-spec db table-spec)
                            #(log/warn (str "Table load failed. Trying again in " %2 " ms") %1)
-                           #(not @stopped)
+                           running?
                            keepalive-interval)))]
         (add-to-cache! schema-cache table schema)
         schema))))
@@ -262,3 +264,72 @@
         group-table-maps
         (filter-database db)
         (filter-tables (set only-tables))))
+
+
+(defprotocol IStartable
+  (start! [this] "Start the given stream if not already started."))
+
+(defprotocol IStoppable
+  (stop! [this] "Stop the given stream if started."))
+
+(defprotocol ISourceable
+  (source [this] "Return the stream output as a Manifold source."))
+
+(defrecord BinlogStream [conf client out-stream started? stopped?]
+  IStartable
+  (start! [_]
+    (when-not @started?
+      (let [timeout (get-in conf [:conn-params :initial-connection-timeout])]
+        (binlog/start-client client timeout))
+      (reset! started? true)))
+
+  IStoppable
+  (stop! [_]
+    (when (and @started? (not @stopped?))
+      (binlog/stop-client client)
+      (manifold.stream/close! out-stream)
+      (reset! stopped? true)))
+
+  ISourceable
+  (source [_] out-stream))
+
+(defn- ->connected-source [ch]
+  (let [stream (manifold.stream/stream)]
+    (manifold.stream/connect ch stream)
+    stream))
+
+(defn new-binlog-stream [conf binlog-pos only-tables out-ch]
+  (let [db-spec            (:db-spec conf)
+        db                 (get-in conf [:conn-params :db])
+        id-fns             (:id-fns conf)
+        keepalive-interval (get-in conf [:conn-params :query-max-keepalive-interval])
+        schema-cache       (atom {})
+        events-xform       (comp
+                            parse-events
+                            (process-events binlog-pos db only-tables))
+        events-ch          (chan 1 events-xform)
+        schema-loaded-ch   (chan 1)
+        started?           (atom false)
+        stopped?           (atom false)
+        client             (binlog/new-binlog-client (:conn-params conf)
+                                                     binlog-pos
+                                                     events-ch)]
+
+    (add-table-schema schema-loaded-ch
+                             events-ch
+                             {:schema-cache schema-cache
+                              :db-spec db-spec
+                              :id-fns id-fns
+                              :keepalive-interval keepalive-interval
+                              :running? #(and @started? (not @stopped?))})
+    (async/pipeline 4
+                    out-ch
+                    (comp (map convert-with-schema)
+                          cat)
+                    schema-loaded-ch)
+
+    (map->BinlogStream {:conf conf
+                        :client client
+                        :out-stream (->connected-source out-ch)
+                        :started? started?
+                        :stopped? stopped?})))
