@@ -1,15 +1,31 @@
 <img src="dumpr.png" title="Dumpr" alt="Dumpr logo"/>
 
 Dumpr is a Clojure library for live replicating data from a MySQL
-database. Data is made available as a stream of upsert and deletes of
-table rows. These streams are exposed as
+database. It allows you to programmatically tap into the MySQL binary
+log. This is the mechanism that MySQL uses to replicate data from
+master to slaves. This library is based on the wonderful
+[MySQL Binary Log connector](https://github.com/shyiko/mysql-binlog-connector-java)
+project. It adds a higher level data format for content consumption
+and a robust stream abstraction to replace callback based interface.
+
+Some potential use cases for this library are:
+
+* populating a search index live without needing to constantly run
+  (potentially expensive) queries against MySQL
+* building live views of data for caching or analytics
+* building a change data capture system by streaming data into Kafka
+  streams, á la
+  [bottledwater-pg](https://github.com/confluentinc/bottledwater-pg).
+
+Data is made available as a stream of upserts and
+deletes of table rows. These streams are exposed as
 [Manifold](https://github.com/ztellman/manifold) sources which can be
 consumed directly or easily coerced into core.async channels et al.
 
-The API consists of two main operations, initial table load and live
-streaming starting from a given binary log position. Both operations
-expose the same data abstraction, an ordered stream of upserts and
-deletes (described in more detail below).
+The API consists of two main operations, initial table load and
+starting a live streaming from a given binary log position. Both
+operations expose the same data abstraction, an ordered stream of
+upserts and deletes (described in more detail below).
 
 This library is work in progress and has bugs. All interfaces must be
 considered subject to change.
@@ -20,19 +36,25 @@ TODO Add a leiningen dependency vector once alpha-x published.
 
 ### Initial load
 
-In order to replicate a data set from MySQL we first start by loading the contents fof a set of desired tables.
+In order to replicate a data set from MySQL we start by loading the
+contents of desired tables.
 
 ```clojure
 > (require '[dumpr.core :as dumpr])
 nil
 
 ;; Create dumpr configuration. See docstring for other options.
-> (def conf (dumpr/create-conf {:user "root" :password "not-root" :host "127.0.0.1" :port 3306 :db "sharetribe_development" :server-id 111}))
+> (def conf (dumpr/create-conf {:user "user"
+                                :password "password"
+                                :host "127.0.0.1"
+                                :port 3306
+                                :db "database_name"
+                                :server-id 111}))
 #'user/conf
 
 ;; Create a table load stream. Tables are loaded and contents returned
 ;; in given order.
-> (def load (dumpr/create-table-stream [:people :addresses] conf))
+> (def load (dumpr/create-table-stream conf [:people :addresses]))
 #'user/load
 
 ;; Grab the Manifold source that will receive the results.
@@ -40,7 +62,7 @@ nil
 #'user/source
 
 ;; Starts the table load operation. Have source consumer setup before
-;; calling this point to avoid unnecessary backpressure.
+;; calling this to avoid unnecessary backpressure.
 > (dumpr/start-stream! table-stream)
 true
 ```
@@ -51,12 +73,12 @@ Binary log streaming is started from the supplied binary log
 position. A binary log position can be grabbed from the table load
 stream to continue streaming new updates that happen after the initial
 load operation. Normally you would then persist the binary log
-position from the stream as you consume updates and use that latest
-position to restart streaming after process restarts. A stored
-position can be validated against the source database to make sure
-it's still available. Binary log retention policy for MySQL is
-configurable.
-
+position from the stream contents as you consume updates and use that
+latest position to restart streaming if/when process restarts. A
+stored position can be validated against the source database to make
+sure it's still available. Binary log retention policy for MySQL is
+configurable. You should set this to allow some margin for downtime in
+replicating process.
 
 ```clojure
 ;; Grab the binary log position. It's a plain clojure map.
@@ -83,18 +105,18 @@ true
 true
 ```
 
-
 ### Row format
 
 The output of both stream operations is a stream of upserts and
-deletes of database table rows. The rows are represented as tuples (vectors): `[op-type table id content metadata]`.
+deletes of database table rows. The rows are represented as tuples
+(vectors): `[op-type table id content metadata]`.
 
 | Field       | Description |
 --------------|-------------|
-| **op-type** | :upsert or :delete |
+| **op-type** | `:upsert` or `:delete` |
 | **table**   | The database table of the row as keyword, example :people |
-| **id**      | Id of the row. By default this is the value of row primary key that the logic can be overridden by passing per table id functions via dumpr/create-conf. See docstring for full explanation. |
-| **content** | The full content of the row as map that is inserted or updated after the operation, or that was just deleted in case of :delete |
+| **id**      | Id of the row. By default this is the value of row primary key. The default can be overridden by passing per table id functions via dumpr/create-conf. See docstring for full explanation. |
+| **content** | The full content of the row as a clojure map that is inserted or updated after the operation, or that was just deleted in case of delete |
 | **metadata** | Only used by binlog stream (`nil` for table stream rows). This is a map like: `{:ts #inst "2015-08-03T10:32:53.000-00:00" :next-position 123 :next-file "host-bin.00001"}`. The ts is a timestamp from MySQL when the binlog event was created. The next-filename and next-position are the binlog position for continuing streaming after this row. |
 
 These tuples are fairly convenient to consume either using vector
@@ -112,7 +134,7 @@ work. For example:
 $ mysqld --log-bin --server-id=5 --binlog_format=ROW
 ```
 
-The server-id has to be something other than what the tests use. By
+The server-id has to be something other than what the test/dev clients use. By
 default tests use server-id `123`.
 
 ### Dev environment
@@ -155,11 +177,12 @@ you wish to override there.
 
 Finally, run the tests with: `lein test`
 
+
 ## License and Copyright
 
 Copyright © 2015 Sharetribe Ltd.
 
-Logo contributed by Janne Koivistoinen.
+The Logo contributed by Janne Koivistoinen.
 
 Distributed under [The Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0)
 
