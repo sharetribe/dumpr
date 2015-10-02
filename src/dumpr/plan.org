@@ -8,11 +8,11 @@
  - [X] Convert text type columns to strings using proper encoding
  - [X] Automated tests for loading and streaming
  - [X] What happens if DB connection drops, can we reconnect?
- - [ ] Automated tests for connection failures and resuming?
  - [X] Validate given binlog stream start positition against available positions
+ - [X] write good (enough) README
+ - [X] decide licence and update
+ - [X] stop event handling - No need, similar handling as DB connection loss
+ - [ ] Automated tests for connection failures and resuming?
  - [ ] Create an example application that uses Dumpr library
- - [ ] stop event handling
  - [ ] channel metrics
  - [ ] Test nexted tx?
- - [ ] write good README
- - [ ] decide licence and update
