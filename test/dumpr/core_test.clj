@@ -130,7 +130,7 @@
 (defn- load-tables-to-coll [tables]
   (let [{:keys [conn-params]} (test-util/config)
         conf (dumpr/create-conf conn-params {})
-        stream (dumpr/create-table-stream tables conf)
+        stream (dumpr/create-table-stream conf tables)
         _ (dumpr/start-stream! stream)]
     {:out (<!! (test-util/sink-to-coll (dumpr/source stream)))
      :binlog-pos (dumpr/next-position stream)}))

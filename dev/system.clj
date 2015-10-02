@@ -50,7 +50,7 @@
   component/Lifecycle
     (start [this]
       (if-not (some? (:result this))
-        (let [stream (dumpr/create-table-stream tables conf)
+        (let [stream (dumpr/create-table-stream conf tables)
               _ (dumpr/start-stream! stream)
               out-rows (sink-source (dumpr/source stream))]
           (-> this

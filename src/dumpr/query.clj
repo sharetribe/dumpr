@@ -18,7 +18,9 @@
 (defn binlog-position
   "Query binary log position from MySQL."
   [db-spec]
-  (first (jdbc/query db-spec ["SHOW MASTER STATUS"])))
+  (select-keys
+   (first (jdbc/query db-spec ["SHOW MASTER STATUS"]))
+   [:file :position]))
 
 (defn show-binlog-positions
   "List all available binary log positions."
