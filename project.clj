@@ -1,8 +1,8 @@
-(defproject dumpr "0.1.0-SNAPSHOT"
-  :description "Library to consume MySQL contents as a stream of updates."
-  :url "FIXME"
-  :license {:name "Eclipse Public License"
-            :url "http://www.eclipse.org/legal/epl-v10.html"}
+(defproject org.sharetribe/dumpr "0.1.0-SNAPSHOT"
+  :description "Live replicate data from a MySQL database to your own process"
+  :url "https://github.com/sharetribe/dumpr"
+  :license {:name "Apache License, Version 2.0"
+            :url "http://www.apache.org/licenses/LICENSE-2.0"}
   :source-paths ["src"]
 
   :dependencies [[org.clojure/clojure "1.7.0"]
