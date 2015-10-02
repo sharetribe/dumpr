@@ -14,7 +14,7 @@ Some potential use cases for this library are:
   (potentially expensive) queries against MySQL
 * building live views of data for caching or analytics
 * building a change data capture system by streaming data into Kafka
-  streams, á la
+  streams, à la
   [bottledwater-pg](https://github.com/confluentinc/bottledwater-pg).
 
 Data is made available as a stream of upserts and
