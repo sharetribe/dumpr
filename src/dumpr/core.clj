@@ -41,22 +41,24 @@
    is exponentially increasing up to this max value. Defaults to 1
    minute.
 
-  id-fns maps table name (key) to function (value) that returns the
-  identifier value for that table row. Normally you'll be using the
-  identifier column as a keyword as the id function (e.g. {:mytable
-  :identifier}). Using id fn is only required when the table doesn't
-  have a single column as primary key that could be autodetected, or
-  when you wish to construct id differently on purpose.
+  (optional) id-fns maps table name (key) to function (value) that
+  returns the identifier value for that table row. Normally you'll be
+  using the identifier column as a keyword as the id function
+  (e.g. {:mytable :identifier}). Using id fn is only required when the
+  table doesn't have a single column as primary key that could be
+  autodetected, or when you wish to construct id differently on
+  purpose.
 
   (optional) db-spec is passed to JDBC when querying database. This is
   optional and should normally be left out. By default db-spec is
   built from conn-params but it can be explicitly specified to use
   e.g. a connection pool."
+  ([conn-params] (create-conf conn-params {} nil))
   ([conn-params id-fns] (create-conf conn-params id-fns nil))
   ([conn-params id-fns db-spec]
    {:db-spec     (or db-spec (query/db-spec conn-params))
     :conn-params (merge conn-param-defaults conn-params)
-    :id-fns      id-fns}))
+    :id-fns      (or id-fns {})}))
 
 
 (def load-buffer-default-size 1000)
@@ -80,9 +82,9 @@
   continue streaming from. This is made available via (next-position
   stream). This position is recorded when the stream is
   started. Calling enxt-position before that returns nil."
-  ([tables conf]
-   (create-table-stream tables conf (chan load-buffer-default-size)))
-  ([tables conf out-ch]
+  ([conf tables]
+   (create-table-stream conf tables (chan load-buffer-default-size)))
+  ([conf tables out-ch]
    (stream/new-table-load-stream tables conf out-ch)))
 
 (defn next-position
@@ -145,12 +147,15 @@
 
 
 (defn start-stream!
-  "Start streaming"
+  "Start streaming. Return `true` when streaming is started. Returns
+  `nil` if streaming was already started before and nothing was done."
   [stream]
   (stream/start! stream))
 
 (defn stop-stream!
-  "Stop the stream. A stream once stopped cannot be restarted."
+  "Stop the stream. A stream once stopped cannot be restarted. Return
+  `true` when streaming is stopped. Returns `nil` if streaming was
+  already stopped before and nothing was done."
   [stream]
   (stream/stop! stream))
 
