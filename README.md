@@ -54,8 +54,8 @@ nil
 
 ;; Create a table load stream. Tables are loaded and contents returned
 ;; in given order.
-> (def load (dumpr/create-table-stream conf [:people :addresses]))
-#'user/load
+> (def table-stream (dumpr/create-table-stream conf [:people :addresses]))
+#'user/table-stream
 
 ;; Grab the Manifold source that will receive the results.
 > (def source (dumpr/source table-stream))
