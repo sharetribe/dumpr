@@ -16,17 +16,19 @@
 (defn gen-manufacturer
   ([]
    (gen/fmap
-    #(zipmap [:name :country :description] %)
+    #(zipmap [:name :country :description :useful] %)
     (gen/tuple (gen/not-empty gen/string-alphanumeric)
                (gen/elements ["us" "fi" "fr" "de" "uk" "nz" "au"])
-               gen/string-alphanumeric)))
+               gen/string-alphanumeric
+               (gen/elements [0 1]))))
   ([ids]
    (gen/fmap
-    #(zipmap [:id :name :country :description] %)
+    #(zipmap [:id :name :country :description :useful] %)
     (gen/tuple (gen/elements ids)
                (gen/not-empty gen/string-alphanumeric)
                (gen/elements ["us" "fi" "fr" "de" "uk" "nz" "au"])
-               gen/string-alphanumeric))))
+               gen/string-alphanumeric
+               (gen/elements [0 1])))))
 
 (defn- clear-millis [date]
   (let [c (doto (Calendar/getInstance)

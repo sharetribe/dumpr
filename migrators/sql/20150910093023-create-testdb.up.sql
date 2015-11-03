@@ -3,6 +3,7 @@ CREATE TABLE `manufacturers` (
   `name` varchar(255) NOT NULL,
   `country` varchar(63) NOT NULL,
   `description` text,
+  `useful` tinyint(1) NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 --;;
