@@ -30,6 +30,8 @@ upserts and deletes (described in more detail below).
 This library is work in progress and might have bugs. All interfaces
 must be considered subject to change.
 
+[![Circle CI](https://circleci.com/gh/sharetribe/dumpr.svg?style=svg&circle-token=a9cd20bf7db48f10a908c9db0b0730131ea9b3fa)](https://circleci.com/gh/sharetribe/dumpr)
+
 ## Installation
 
 With Leiningen/Boot:
