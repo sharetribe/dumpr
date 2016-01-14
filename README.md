@@ -27,12 +27,16 @@ starting a live streaming from a given binary log position. Both
 operations expose the same data abstraction, an ordered stream of
 upserts and deletes (described in more detail below).
 
-This library is work in progress and has bugs. All interfaces must be
-considered subject to change.
+This library is work in progress and might have bugs. All interfaces
+must be considered subject to change.
 
-## Usage
+## Installation
 
-TODO Add a leiningen dependency vector once alpha-x published.
+With Leiningen/Boot:
+
+```clojure
+[org.sharetribe/dumpr "0.1.1-alpha1"]
+```
 
 ### Initial load
 
@@ -122,6 +126,25 @@ deletes of database table rows. The rows are represented as tuples
 These tuples are fairly convenient to consume either using vector
 destructuring or then using the
 [core.match](https://github.com/clojure/core.match) library.
+
+### Using a Database Connection Pool
+
+When creating the dumpr configuration you can optionally pass in your
+own db-spec. When present, dumpr skips constructing it's own
+db-spec. This db-spec is passed through as is to all queries via
+[clojure.java.jdbc](https://github.com/clojure/java.jdbc). If you
+handle creating db-spec yourself you must ensure you include these two
+properties to MySQL Connector/J:
+
+* zeroDateTimeBehavior=convertToNull
+* tinyInt1isBit=false
+
+These ensure that both batch loading and streaming return exactly the
+same data in the same row format. This is the fundamental guarantee
+about data shape that the Dumpr abtraction aims to keep.
+
+For more information about clojure.java.jdbc connection pooling see:
+[http://clojure-doc.org/articles/ecosystem/java_jdbc/connection_pooling.html](http://clojure-doc.org/articles/ecosystem/java_jdbc/connection_pooling.html).
 
 ## Development
 
