@@ -268,9 +268,7 @@
 
 
 (defn- ->connected-source [ch]
-  (let [stream (manifold.stream/stream)]
-    (manifold.stream/connect ch stream)
-    stream))
+  (manifold.stream/->source ch))
 
 
 (defprotocol IStartable
