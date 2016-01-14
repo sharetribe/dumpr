@@ -19,6 +19,20 @@
    :initial-connection-timeout 3000
    :query-max-keepalive-interval 60000})
 
+(s/defschema ConfSchema
+  {:db-spec s/Any
+   :conn-params {:stream-keepalive-interval s/Int
+                 :stream-keepalive-timeout s/Int
+                 :initial-connection-timeout s/Int
+                 :query-max-keepalive-interval s/Int
+                 s/Keyword s/Any}
+   :id-fns {s/Keyword s/Any}})
+
+(defn- validate-conf [conf]
+  (when-let [err (s/check ConfSchema conf)]
+    (throw (ex-info "Invalid dumpr configuration."
+                    {:validation-errs err}))))
+
 (defn create-conf
   "Create a common configuration map needed by stream and table load.
 
@@ -85,6 +99,7 @@
   ([conf tables]
    (create-table-stream conf tables (chan load-buffer-default-size)))
   ([conf tables out-ch]
+   (validate-conf conf)
    (stream/new-table-load-stream tables conf out-ch)))
 
 (defn next-position
@@ -105,6 +120,7 @@
   never occurs when the continue position is fetched from an event
   produced by the lib."
   [conf binlog-pos]
+  (validate-conf conf)
   (let [db-spec                 (:db-spec conf)
         {:keys [file position]} binlog-pos
         valid-positions         (query/show-binlog-positions db-spec)]
@@ -121,11 +137,12 @@
 
   Returns the binlog position as {:file \"filename\" :position 123}"
   [conf]
+  (validate-conf conf)
   (let [db-spec (:db-spec conf)]
     (query/binlog-position db-spec)))
 
 
-(defn- validate-binlog-pos! [conf binlog-pos]
+(defn- validate-binlog-pos [conf binlog-pos]
   (when-not (valid-binlog-pos? conf binlog-pos)
     (throw (ex-info "Invalid binary log position."
                     {:binlog-pos binlog-pos}))))
@@ -152,7 +169,8 @@
    (create-binlog-stream conf binlog-pos only-tables (chan stream-buffer-default-size)))
 
   ([conf binlog-pos only-tables out-ch]
-   (validate-binlog-pos! conf binlog-pos)
+   (validate-conf conf)
+   (validate-binlog-pos conf binlog-pos)
    (stream/new-binlog-stream conf binlog-pos only-tables out-ch)))
 
 
