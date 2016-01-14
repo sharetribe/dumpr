@@ -7,10 +7,10 @@
 
   :dependencies [[org.clojure/clojure "1.7.0"]
                  [org.clojure/core.async "0.2.374"]
+                 [org.clojure/tools.logging "0.3.1"]
                  [mysql/mysql-connector-java "5.1.38"]
                  [org.clojure/java.jdbc "0.4.2"]
                  [prismatic/schema "1.0.4"]
-                 [com.taoensso/timbre "4.1.2"]
                  [com.github.shyiko/mysql-binlog-connector-java "0.2.3"]
                  [manifold "0.1.1"]]
 

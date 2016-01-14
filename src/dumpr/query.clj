@@ -2,7 +2,7 @@
   "Functions to query data from MySQL and parse the query results."
   (:require [clojure.java.jdbc :as jdbc]
             [clojure.core.async :as async :refer [>!!]]
-            [taoensso.timbre :as log]
+            [clojure.tools.logging :as log]
             [dumpr.row-format :as row-format]))
 
 

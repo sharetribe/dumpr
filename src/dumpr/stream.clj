@@ -3,7 +3,7 @@
   (:require [clojure.core.async :as async :refer [go go-loop <! >! thread chan]]
             [schema.core :as s]
             [dumpr.table-schema :as table-schema]
-            [taoensso.timbre :as log]
+            [clojure.tools.logging :as log]
             [manifold.stream]
             [dumpr.query :as query]
             [dumpr.utils :as utils]

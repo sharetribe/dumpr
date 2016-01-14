@@ -4,7 +4,7 @@
   (:require [clojure.java.jdbc :as jdbc]
             [clojure.core.async :as async :refer [chan >!!]]
             [schema.core :as s]
-            [taoensso.timbre :as log]
+            [clojure.tools.logging :as log]
             [manifold.stream]
             [dumpr.query :as query]
             [dumpr.table-schema :as table-schema]
