@@ -6,13 +6,13 @@
   :source-paths ["src"]
 
   :dependencies [[org.clojure/clojure "1.7.0"]
-                 [org.clojure/core.async "0.1.346.0-17112a-alpha"]
-                 [mysql/mysql-connector-java "5.1.36"]
+                 [org.clojure/core.async "0.2.374"]
+                 [mysql/mysql-connector-java "5.1.38"]
                  [org.clojure/java.jdbc "0.4.2"]
-                 [prismatic/schema "1.0.1"]
+                 [prismatic/schema "1.0.4"]
                  [com.taoensso/timbre "4.1.2"]
                  [com.github.shyiko/mysql-binlog-connector-java "0.2.3"]
-                 [manifold "0.1.0"]]
+                 [manifold "0.1.1"]]
 
   :global-vars {*warn-on-reflection* true}
   :min-lein-version "2.5.0"
