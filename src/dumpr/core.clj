@@ -114,6 +114,16 @@
                       (<= position file_size))))
          boolean)))
 
+(defn binlog-position
+  "Query the most recent binary log position. This function can also
+  be used as a way to test the connection to database by checking the
+  possible raised exception.
+
+  Returns the binlog position as {:file \"filename\" :position 123}"
+  [conf]
+  (let [db-spec (:db-spec conf)]
+    (query/binlog-position db-spec)))
+
 
 (defn- validate-binlog-pos! [conf binlog-pos]
   (when-not (valid-binlog-pos? conf binlog-pos)
