@@ -37,7 +37,7 @@ must be considered subject to change.
 With Leiningen/Boot:
 
 ```clojure
-[org.sharetribe/dumpr "0.1.1-alpha1"]
+[org.sharetribe/dumpr "0.1.2"]
 ```
 
 ### Initial load
