@@ -40,12 +40,12 @@
     (let [count (jdbc/query
                  db-spec
                  [(str "SELECT * FROM " (name table))]
-                 :row-fn (fn [v]
-                           ;; Block until output written to make sure
-                           ;; we don't close DB connection too early.
-                           (>!! ch (row-format/upsert table (id-fn v) v nil))
-                           1)
-                 :result-set-fn (partial reduce + 0))]
+                 {:row-fn (fn [v]
+                            ;; Block until output written to make sure
+                            ;; we don't close DB connection too early.
+                            (>!! ch (row-format/upsert table (id-fn v) v nil))
+                            1)
+                  :result-set-fn (partial reduce + 0)})]
       (log/info "Loaded" count "rows from table" table))
     (async/close! ch)))
 
