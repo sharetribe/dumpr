@@ -1,4 +1,7 @@
+### 0.1.3
 
+* update dependency java.jdbc to 0.6.1
+* remove joplin as unecessary
 
 ### 0.1.2
 

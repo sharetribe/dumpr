@@ -21,11 +21,7 @@
    :id-fns        {s/Keyword (s/pred ifn?)}
    :tables        [s/Keyword]
    :filter-tables #{s/Keyword}
-   :joplin        {:migrators {s/Keyword s/Str}
-                   :databases {s/Keyword {:type s/Keyword
-                                          :url s/Str}}
-                   :environments {s/Keyword [s/Any]}}})
-
+   :test-db       {:url s/Str}})
 
 (defn sink-source
   "Returns an atom containing a vector. Consumes values from the
