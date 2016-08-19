@@ -205,7 +205,7 @@ Finally, run the tests with: `lein test`
 
 ## License and Copyright
 
-Copyright © 2015 [Sharetribe Ltd](https://www.sharetribe.com).
+Copyright © 2016 [Sharetribe Ltd](https://www.sharetribe.com).
 
 The Logo contributed by Janne Koivistoinen.
 
