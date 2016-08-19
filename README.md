@@ -167,9 +167,9 @@ default tests use server-id `123`.
 For development purposes the dev code includes a
 [Component](https://github.com/stuartsierra/component) based
 system. The configuration for which server and database to connect
-must be defined in conf/dumpr-dev-configuration.edn. You can create
+must be defined in config/dumpr-dev-configuration.edn. You can create
 your own setup by copying the default configuration,
-conf/dumpr-lib-configuration.edn and overriding the keys you want to
+[config/dumpr-lib-configuration.edn](config/dumpr-lib-configuration.edn) and overriding the keys you want to
 change.
 
 When the configuration is in order you can start the dev system by running `(reset)` in user namespace.
@@ -194,7 +194,7 @@ mysql -u root < setup_test_db.sql
 ```
 
 These default settings are stored in
-config/dumpr-lib-configuration.edn. If you wish to use different
+[config/dumpr-lib-configuration.edn](config/dumpr-lib-configuration.edn). If you wish to use different
 database connection parameters, test database name or database user
 you can override any of the default settings by creating a
 config/dumpr-test-configuration.edn and defining the configurations
