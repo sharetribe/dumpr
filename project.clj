@@ -21,7 +21,5 @@
                    :dependencies [[com.stuartsierra/component "0.2.3"]
                                   [reloaded.repl "0.2.0"]
                                   [io.aviso/config "0.1.7"]
-                                  [joplin.core "0.3.3"]
-                                  [joplin.jdbc "0.3.3"]
                                   [org.clojure/test.check "0.8.2"]
                                   [com.gfredericks/test.chuck "0.2.0"]]}})

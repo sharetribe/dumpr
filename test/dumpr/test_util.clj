@@ -1,7 +1,6 @@
 (ns dumpr.test-util
   (:require [clojure.java.jdbc :as jdbc]
             [clojure.core.async :as async :refer [<! >! <!! go-loop chan]]
-            [joplin.repl :as repl]
             [io.aviso.config :as config]
             [manifold.stream]
             [system :refer [LibConf]]))
@@ -11,17 +10,49 @@
                                   :profiles [:lib :test]
                                   :schemas [LibConf]}))
 
-(defn joplin-config []
-  (:joplin (config)))
-
 (defn db-spec []
-  {:connection-uri (-> (joplin-config) :databases :sql-test :url)})
+  {:connection-uri (-> (config) :test-db :url)})
 
+(def tables-spec
+  {:manufacturers [[:id "int(11)" "not null" "auto_increment" "primary key"]
+                   [:name "varchar(255)" "not null"]
+                   [:country "varchar(63)" "not null"]
+                   [:description :text]
+                   [:useful "tinyint(1)" "not null"]]
+
+   :widgets       [[:id "int(11)" "not null" "auto_increment" "primary key"]
+                   [:name "varchar(255)" "not null" ]
+                   [:type "varchar(63)" "not null"]
+                   [:price_cents "int(11)" "not null"]
+                   [:description "text"]
+                   [:manufacturer_id "int(11)" "not null"]
+                   [:created_at "datetime" "not null"]]})
+
+(defn create-test-tables!
+  "Create test tables"
+  [conn]
+  (jdbc/db-do-commands conn
+                       (map
+                        (fn [[table spec]]
+                          (jdbc/create-table-ddl table
+                                                 spec
+                                                 {:table-spec "ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;"}))
+                        tables-spec)))
+
+(defn drop-test-tables!
+  "Drop test tables"
+  [conn]
+  (jdbc/db-do-commands conn
+                       (map
+                        (fn [[table _]]
+                          (jdbc/drop-table-ddl (str "IF EXISTS " (name table))))
+                        tables-spec)))
 
 (defn reset-test-db!
-  "Clear the contents of the test db and reset schema."
   []
-  (with-out-str (repl/reset (joplin-config) :test :sql-test)))
+  (jdbc/with-db-connection [conn (db-spec)]
+    (drop-test-tables! conn)
+    (create-test-tables! conn)))
 
 (defn sink-to-coll
   "Sink a manifold source into a collection. Return a core.async
