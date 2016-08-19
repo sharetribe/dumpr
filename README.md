@@ -143,7 +143,7 @@ properties to MySQL Connector/J:
 
 These ensure that both batch loading and streaming return exactly the
 same data in the same row format. This is the fundamental guarantee
-about data shape that the Dumpr abtraction aims to keep.
+about data shape that the Dumpr abstraction aims to keep.
 
 For more information about clojure.java.jdbc connection pooling see:
 [http://clojure-doc.org/articles/ecosystem/java_jdbc/connection_pooling.html](http://clojure-doc.org/articles/ecosystem/java_jdbc/connection_pooling.html).
