@@ -202,6 +202,12 @@ you wish to override there.
 
 Finally, run the tests with: `lein test`
 
+## Ideas
+
+* Heartbeat event for slowly updating (or heavily filtered) sources to keep binlog position fresh.
+* DDL parsing to replace the naive table schema cache. This would allow processing and reprocessing events from the past after table schema changes.
+* Change (undocumented) error events to exceptions and document the behavior.
+
 
 ## License and Copyright
 
