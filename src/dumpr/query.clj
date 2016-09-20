@@ -11,7 +11,7 @@
   [{:keys [host port db user password subname]}]
   {:subprotocol "mysql"
    :subname     (or subname
-                    (str "//" host ":" port "/" db "?zeroDateTimeBehavior=convertToNull&tinyInt1isBit=false&useLegacyDatetimeCode=false"))
+                    (str "//" host ":" port "/" db "?zeroDateTimeBehavior=convertToNull&tinyInt1isBit=false&useLegacyDatetimeCode=false&useSSL=false"))
    :user        user
    :password    password})
 
