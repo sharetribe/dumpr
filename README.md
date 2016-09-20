@@ -8,6 +8,8 @@ master to slaves. This library is based on the wonderful
 project. It adds a higher level data format for content consumption
 and a robust stream abstraction to replace callback based interface.
 
+Dumpr targets MySQL version 5.7.x. It might work against other versions of MySQL as well, but that's not guaranteed.
+
 Some potential use cases for this library are:
 
 * populating a search index live without needing to constantly run
@@ -39,7 +41,7 @@ Make sure your MySQL server is using UTC.
 With Leiningen/Boot:
 
 ```clojure
-[org.sharetribe/dumpr "0.1.3"]
+[org.sharetribe/dumpr "0.2.0"]
 ```
 
 ### Initial load

@@ -1,5 +1,7 @@
 ### Unreleased
 
+### 0.2.0
+
 * update dependency mysql-connector-java to 5.1.39
 * update dependency mysql-binlog-connector-java to 0.4.1
 * update default database connection settings to better work with MySQL 5.7
