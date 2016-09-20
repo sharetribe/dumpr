@@ -1,7 +1,3 @@
-machine:
-  timezone:
-    Europe/Helsinki
-
 dependencies:
   pre:
     - sudo sed -i '$ a log_bin\nserver-id=5' /etc/mysql/my.cnf
