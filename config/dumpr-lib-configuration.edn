@@ -19,4 +19,4 @@
  :id-fns      {} ; {:table_no_primary_key :username}
  :tables      [] ; [:table_no_primary_key :another_table]
  :filter-tables #{}
- :test-db {:url "jdbc:mysql://localhost/${DB:dumpr_test_db_123}?user=${DB_USER:dumpr_test}&password=${DB_PASSWORD:dumpr_test}"}}
+ :test-db {:url "jdbc:mysql://localhost/${DB:dumpr_test_db_123}?useLegacyDatetimeCode=false&user=${DB_USER:dumpr_test}&password=${DB_PASSWORD:dumpr_test}"}}
