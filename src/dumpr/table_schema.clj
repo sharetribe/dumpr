@@ -52,7 +52,7 @@
 
 (s/defn ->table-spec :- TableSpec
   [table :- s/Keyword
-   id-fns :- {}]
+   id-fns :- {s/Keyword clojure.lang.IFn}]
   {:table table :id-fn (id-fns table)})
 
 (defn load-and-parse-schemas
