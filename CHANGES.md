@@ -1,5 +1,10 @@
 ### Unreleased
 
+### 0.2.1
+
+* Fix concurrency bug with multiple dumpr instances by fixing
+  ->table-spec argument specs
+
 ### 0.2.0
 
 * update dependency mysql-connector-java to 5.1.39
