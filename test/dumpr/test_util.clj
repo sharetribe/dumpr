@@ -94,6 +94,16 @@
      []
      ops)))
 
+(defn update-in-db!
+  [table a-map where]
+  (jdbc/with-db-connection [conn (db-spec)]
+    (jdbc/update! conn table a-map where)))
+
+(defn delete-from-db!
+  [table where]
+  (jdbc/with-db-connection [conn (db-spec)]
+    (jdbc/delete! conn table where)))
+
 (defn table-id-key [[_ table id _ _]]
   (str table "/" id))
 
@@ -111,4 +121,3 @@
                 :delete (dissoc entities key))))
           {}
           ops))
-

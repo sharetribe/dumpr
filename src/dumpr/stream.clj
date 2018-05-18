@@ -75,21 +75,26 @@
 
 (def group-table-maps
   "A stateful transducer to group table-map events with the following
-  write/update/delete operation."
+  write/update/delete operations."
   (fn [rf]
-    (let [prev (volatile! [::none])]
+    (let [last-table-map (volatile! [::none])]
       (fn
         ([] (rf))
         ([result] (rf result))
 
         ([result input]
-         (let [prior @prev]
-           (vreset! prev input)
-           (if (= (events/event-type input) :table-map)
-             result                           ; Delay table-map events
-             (if (= (events/event-type prior) :table-map)
-               (rf result [prior input])      ; Return table-map op as pair
-               (rf result [input])))))))))    ; op without table map, just wrap
+         (let [table-map @last-table-map
+               event-type (events/event-type input)]
+           (cond
+             (= event-type :table-map) (do
+                                         (vreset! last-table-map input)
+                                         result) ; Delay table-map events
+
+             ;; Return [table-map op] as pair
+             (#{:write :update :delete} event-type) (rf result [table-map input])
+
+             ;; Wrap op
+             :else (rf result [input]))))))))
 
 (defn- ->db [event-pair]
   (let [[[event-type event-body]] event-pair]
