@@ -1,4 +1,4 @@
-(defproject org.sharetribe/dumpr "0.2.1"
+(defproject org.sharetribe/dumpr "0.2.2-SNAPSHOT"
   :description "Live replicate data from a MySQL database to your own process"
   :url "https://github.com/sharetribe/dumpr"
   :license {:name "Apache License, Version 2.0"
