@@ -1,7 +1,7 @@
 (ns dumpr.core-test
   (:require [clojure.test.check.generators :as gen]
             [clojure.test :as test :refer [deftest testing use-fixtures is]]
-            [clojure.core.async :refer [<!!]]
+            [clojure.core.async :refer [<!!] :as async]
             [com.gfredericks.test.chuck.clojure-test :refer [checking]]
             [com.gfredericks.test.chuck :as chuck]
             [com.gfredericks.test.chuck.generators :as gen']
@@ -146,10 +146,16 @@
     (dumpr/start-stream! stream)
     stream))
 
-(defn- stream-to-coll-and-close [stream n]
-  (let [out (<!! (test-util/sink-to-coll (dumpr/source stream) n))]
-    (dumpr/stop-stream! stream)
-    out))
+(defn- stream-to-coll-and-close
+  ([stream n] (stream-to-coll-and-close stream n 60000))
+  ([stream n timeout-ms]
+   (let [timeout (async/timeout timeout-ms)
+         [out p] (async/alts!! [timeout
+                                (test-util/sink-to-coll (dumpr/source stream) n)])]
+     (dumpr/stop-stream! stream)
+     (if (= p timeout)
+       (throw (ex-info "Timeout waiting for ops in stream" {}))
+       out))))
 
 
 ;; Tests
@@ -180,6 +186,44 @@
       (is (= (test-util/into-entity-map (concat initial streamed))
              (test-util/into-entity-map (concat out stream-out)))))))
 
+;; Should be high enough to cause MySQL to split ops in binlog
+(def test-data-count 300)
+
+(def test-data
+  (into []
+        (mapcat
+         (fn [i]
+           [[:insert :manufacturers i {:id i
+                                       :name (str "man" i)
+                                       :country "fi"
+                                       :description (str "Description of man" i)
+                                       :useful 1}
+             nil]
+            [:insert :widgets i {:id i
+                                 :name (str "widget" i)
+                                 :type "a-type"
+                                 :price_cents 10
+                                 :description (str "description of widget" i)
+                                 :manufacturer_id (inc (mod i 10))
+                                 :created_at (java.util.Date.)}
+             nil]]))
+        (range 1 (inc test-data-count))))
+
+(deftest streaming-multirow-updates
+  (testing "updates to multiple rows in same query"
+    (test-util/reset-test-db!)
+    (test-util/into-test-db! test-data)
+    (let [{:keys [out binlog-pos]} (load-tables-to-coll [:widgets :manufacturers])
+          stream (create-and-start-stream binlog-pos [:widgets :manufacturers])
+          _ (test-util/update-in-db! :manufacturers {:description "updated description"} ["id <= ?" test-data-count])
+          _ (test-util/delete-from-db! :widgets ["id <= ?" test-data-count])
+          stream-out (stream-to-coll-and-close stream (* 2 test-data-count) 10000)
+          result-entities (test-util/into-entity-map (concat test-data stream-out))]
+      ;; check all descriptions match and no widgets remain
+      (is (= test-data-count (-> result-entities vals count)))
+      (is (every? #(= (get % :description)
+                      "updated description")
+                  (vals result-entities))))))
 
 (comment
   (test/run-tests)
