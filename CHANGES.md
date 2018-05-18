@@ -1,5 +1,8 @@
 ### Unreleased
 
+* Fix issue with binlog streaming missing events when queries affect multiple
+  rows
+
 ### 0.2.1
 
 * Fix concurrency bug with multiple dumpr instances by fixing
@@ -25,4 +28,3 @@
 ### 0.1.1-alpha1
 
 * initial release
-
