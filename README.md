@@ -212,6 +212,12 @@ Finally, run the tests with: `lein test`
 * DDL parsing to replace the naive table schema cache. This would allow processing and reprocessing events from the past after table schema changes.
 * Change (undocumented) error events to exceptions and document the behavior.
 
+## Known issues
+
+* The next binlog position returned in events may not be usable when single SQL
+  query caused large number of rows to change. This can manifest itself in the
+  rare event when a consumer crashes during processing of the set of events
+  corresponding to the single query.
 
 ## License and Copyright
 
@@ -220,4 +226,3 @@ Copyright © 2016 [Sharetribe Ltd](https://www.sharetribe.com).
 The Logo contributed by Janne Koivistoinen.
 
 Distributed under [The Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0)
-
