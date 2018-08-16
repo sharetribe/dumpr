@@ -1,0 +1,40 @@
+version: 2
+jobs:
+  test:
+    docker:
+      - image: clojure:lein-2.7.1
+        environment:
+          LOG_LEVEL: INFO
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+      - image: mysql:5.7
+        environment:
+          MYSQL_ROOT_PASSWORD=very-secret
+        command: mysqld --log-bin=mysqld-bin --server-id=5 --binlog_format=ROW
+    steps:
+      - checkout
+      - run:
+          name: install mysql client
+          command: apt-get update && apt-get install -y mysql-client
+      - restore_cache:
+          key: m2-cache-{{ checksum "project.clj" }}
+      - run:
+          name: Lein deps
+          command: 'lein deps'
+      - save_cache:
+          key: m2-cache-{{ checksum "project.clj" }}
+          paths:
+            - ~/.m2
+      - run:
+          name: setup db
+          command: mysql -h 127.0.0.1 -uroot -pvery-secret < create_test_db.sql
+      - run:
+          name: run tests
+          command: lein test
+          environment:
+            TEST_CHECK_FACTOR: 15
+workflows:
+  version: 2
+  test:
+    jobs:
+      - test
