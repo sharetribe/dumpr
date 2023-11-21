@@ -15,7 +15,7 @@ jobs:
       - checkout
       - run:
           name: install mysql client
-          command: apt-get update && apt-get install -y mysql-client
+          command: script/install-mysql-client.sh
       - restore_cache:
           key: m2-cache-{{ checksum "project.clj" }}
       - run:
