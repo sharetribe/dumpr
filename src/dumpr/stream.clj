@@ -211,9 +211,17 @@
               (recur))))
       (async/close! out))))
 
+(def mysql-charset->charset
+  {"utf8mb4" "UTF-8"
+   "utf8mb3" "UTF-8"})
+
+(defn- charset
+  [c]
+  (get mysql-charset->charset c c))
+
 (defn- convert-text [col #^bytes val]
   (when val
-    (String. val (java.nio.charset.Charset/forName (:character-set col)))))
+    (String. val (java.nio.charset.Charset/forName (charset (:character-set col))))))
 
 (defmulti convert-type :type)
 (defmethod convert-type :tinytext   [col val] (convert-text col val))
