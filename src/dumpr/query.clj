@@ -3,7 +3,8 @@
   (:require [clojure.java.jdbc :as jdbc]
             [clojure.core.async :as async :refer [>!!]]
             [clojure.tools.logging :as log]
-            [dumpr.row-format :as row-format]))
+            [dumpr.row-format :as row-format])
+  (:import (java.time LocalDateTime ZoneOffset)))
 
 
 (defn db-spec
@@ -28,6 +29,19 @@
   [db-spec]
   (jdbc/query db-spec ["SHOW BINARY LOGS"]))
 
+(defn- convert-timestamps
+  [row]
+  (into {}
+        (map (fn [[k v]]
+               (if (instance? LocalDateTime v)
+                 ;; Converting with hard-coded UTC timezone is ok and matches
+                 ;; previous behavior. The LocalDateTime value is already
+                 ;; possibly converted by the MySQL connector, depending on the
+                 ;; connection configuration.
+                 [k (java.util.Date/from (.toInstant ^LocalDateTime v ZoneOffset/UTC))]
+                 [k v])))
+        row))
+
 (defn stream-table
   "Stream the contents of a given database table to a core.async
   channel. Designed to work as async-fn of
@@ -43,7 +57,7 @@
                  {:row-fn (fn [v]
                             ;; Block until output written to make sure
                             ;; we don't close DB connection too early.
-                            (>!! ch (row-format/upsert table (id-fn v) v nil))
+                            (>!! ch (row-format/upsert table (id-fn v) (convert-timestamps v) nil))
                             1)
                   :result-set-fn (partial reduce + 0)})]
       (log/info "Loaded" count "rows from table" table))
