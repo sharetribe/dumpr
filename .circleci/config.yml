@@ -7,7 +7,7 @@ jobs:
           LOG_LEVEL: INFO
           DB_HOST: 127.0.0.1
           DB_PORT: 3306
-      - image: mysql:5.7
+      - image: mysql:8.0.35-debian
         environment:
           MYSQL_ROOT_PASSWORD=very-secret
         command: mysqld --log-bin=mysqld-bin --server-id=5 --binlog_format=ROW
