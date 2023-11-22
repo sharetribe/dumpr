@@ -1,3 +1,18 @@
+### 1.0.0-alpha1
+
+* Update dependency mysql-connector-java to 8.0.33.
+  NOTE: This is a breaking change, if the library configuration uses `:subname`
+  to override the MySQL connection string. No change is necessary, if you use
+  the `DB_*` environment variables for configuring the connection. For details,
+  see [MySQL Connector/J configuration
+  reference](https://dev.mysql.com/doc/connector-j/en/connector-j-reference-configuration-properties.html).
+  At least, replace `useLegacyDatetimeCode=false` with
+  `preserveInstants=true&connectionTimeZone=SERVER` in your connection strings.
+* Replace dependency `com.github.shyiko/mysql-binlog-connector-java` with
+  [successor](https://github.com/osheroff/mysql-binlog-connector-java)
+  `com.zendesk/mysql-binlog-connector-java` 0.28.3.
+* Add support for MySQL server 8.0.
+
 ### 0.2.2
 
 * Fix issue with binlog streaming missing events when queries affect multiple
