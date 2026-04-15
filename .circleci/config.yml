@@ -2,7 +2,7 @@ version: 2
 jobs:
   test:
     docker:
-      - image: clojure:lein-bullseye
+      - image: clojure:openjdk-11-lein-bullseye
         environment:
           LOG_LEVEL: INFO
           DB_HOST: 127.0.0.1
