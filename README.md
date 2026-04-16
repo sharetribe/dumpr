@@ -8,7 +8,7 @@ master to slaves. This library is based on the wonderful
 project. It adds a higher level data format for content consumption
 and a robust stream abstraction to replace callback based interface.
 
-Dumpr targets MySQL version 5.7.x and 8.0.x. It might work against other
+Dumpr targets MySQL version 5.7.x, 8.0.x. and 8.4.x. It might work against other
 versions of MySQL as well, but that's not guaranteed.
 
 Some potential use cases for this library are:
@@ -222,7 +222,7 @@ Finally, run the tests with: `lein test`
 
 ## License and Copyright
 
-Copyright © 2016 [Sharetribe Ltd](https://www.sharetribe.com).
+Copyright © 2026 [Sharetribe Ltd](https://www.sharetribe.com).
 
 The Logo contributed by Janne Koivistoinen.
 
