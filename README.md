@@ -42,7 +42,7 @@ Make sure your MySQL server is using UTC.
 With Leiningen/Boot:
 
 ```clojure
-[org.sharetribe/dumpr "v1.0.0-alpha1"]
+[org.sharetribe/dumpr "v1.1.0"]
 ```
 
 ### Initial load
