@@ -1,6 +1,7 @@
 (ns dumpr.query
   "Functions to query data from MySQL and parse the query results."
   (:require [clojure.java.jdbc :as jdbc]
+            [clojure.string :as string]
             [clojure.core.async :as async :refer [>!!]]
             [clojure.tools.logging :as log]
             [dumpr.row-format :as row-format])
@@ -16,10 +17,33 @@
    :user        user
    :password    password})
 
+(defn- parse-mysql-version
+  [version-str]
+  (let [numeric (first (string/split version-str #"-"))]
+    (mapv #(Long/parseLong %) (string/split numeric #"\."))))
+
+(defn- mysql-version>=
+  [[maj1 min1] [maj2 min2]]
+  (or (> maj1 maj2)
+      (and (= maj1 maj2) (>= min1 min2))))
+
+(defn- binlog-status-query
+  "Return the appropriate SQL query for binlog position based on
+  MySQL server version. MySQL 8.4+ replaced SHOW MASTER STATUS with
+  SHOW BINARY LOG STATUS."
+  [db-spec]
+  (let [version-str (-> (jdbc/query db-spec ["SELECT VERSION() AS version"])
+                        first
+                        :version)
+        version (parse-mysql-version version-str)]
+    (if (mysql-version>= version [8 4])
+      "SHOW BINARY LOG STATUS"
+      "SHOW MASTER STATUS")))
+
 (defn binlog-position
   "Query binary log position from MySQL."
   [db-spec]
-  (-> (jdbc/query db-spec ["SHOW MASTER STATUS"])
+  (-> (jdbc/query db-spec [(binlog-status-query db-spec)])
       first
       (select-keys [:file :position])
       (update :position long)))
