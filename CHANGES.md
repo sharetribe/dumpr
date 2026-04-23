@@ -1,3 +1,9 @@
+### 1.1.0
+
+* Add support for MySQL 8.4.x.
+* Update dependency mysql-connector-j to 8.4.0.
+* Update dependency mysql-binlog-conncetor-java to 0.30.3.
+
 ### 1.0.0-alpha1
 
 * Update dependency mysql-connector-java to 8.0.33.
